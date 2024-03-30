@@ -39,8 +39,21 @@ void *handle_client(void *arg) {
 
         // Send the message to all clients, including the one who sent it
         for (int i = 0; i < num_clients; i++) {
+            // +1 for null terminator
+            int required_size = snprintf(NULL, 0, "client %d: %s", client_id, buffer) + 1; 
+            char *message = (char *)malloc(required_size);
+
+            if (message == NULL) {
+                perror("malloc failed");
+                exit(EXIT_FAILURE);
+            }
+            snprintf(message, required_size, "client %d: %s", client_id, buffer);
+
             
-            send(clients[i].socket, buffer, strlen(buffer), 0);
+            send(clients[i].socket, message, strlen(message), 0);
+
+            // free messgae we don't need it anymore
+            free(message);
         }
     }
 
@@ -83,19 +96,25 @@ int main(int argc, char const *argv[]) {
     printf("Server listening on port %d...\n", PORT);
 
     while (1) {
-        // Accept incoming connection
+         // Accept incoming connection
         if ((new_socket = accept(server_fd, (struct sockaddr *)&address, (socklen_t *)&addrlen)) < 0) {
             perror("accept");
             exit(EXIT_FAILURE);
         }
 
-        // Assign a unique ID to the client
-        int client_id = num_clients + 1;
+        // Receive client ID
+        int client_id;
+        if (recv(new_socket, &client_id, sizeof(int), 0) <= 0) {
+            perror("recv failed");
+            close(new_socket);
+            continue; // Continue to next iteration
+        }
 
         // Store the client information
         clients[num_clients].id = client_id;
         clients[num_clients].socket = new_socket;
         num_clients++;
+
 
         // Create a new thread to handle the client
         pthread_t client_thread;

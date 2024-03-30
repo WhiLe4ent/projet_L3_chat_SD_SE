@@ -26,9 +26,14 @@ void *send_message(void *arg) {
 }
 
 int main(int argc, char const *argv[]) {
-    int sock = 0, valread;
+int sock = 0, valread;
     struct sockaddr_in serv_addr;
     char buffer[1024] = {0};
+    int client_id; // ID du client
+
+    // Demande d'ID au lancement du client
+    printf("Enter your client ID: ");
+    scanf("%d", &client_id);
 
     // Create client socket
     if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
@@ -51,6 +56,9 @@ int main(int argc, char const *argv[]) {
         return -1;
     }
 
+    // Envoi de l'ID au serveur
+    send(sock, &client_id, sizeof(int), 0);
+
     // Create a thread to send messages to the server
     pthread_t send_thread;
     if (pthread_create(&send_thread, NULL, send_message, (void *)&sock) != 0) {
@@ -68,7 +76,7 @@ int main(int argc, char const *argv[]) {
             printf("\nServer disconnected\n");
             break;
         }
-        printf("Server: %s", buffer);
+        printf(" %s", buffer);
     }
 
     // Close the socket
