@@ -12,10 +12,35 @@
 #define PORT 8080
 #define PIPE_NAME "message_pipe"
 
-// Function to send messages to the server and pipe
+// Mutex for pipe access
+pthread_mutex_t pipe_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+// Function to send messages to the server
 void *send_message(void *arg) {
     int sock = *((int *)arg);
     char message[1024];
+
+    while (1) {
+        // Read message from user input
+        printf("\nEnter a message: ");
+        fgets(message, sizeof(message), stdin);
+
+        // Send message to the server via socket
+        send(sock, message, strlen(message), 0);
+
+        // Check for client disconnection
+        if (strcmp(message, "exit\n") == 0) {
+            break;
+        }
+    }
+
+    return NULL;
+}
+
+// Function to receive messages from the server and send them to the pipe
+void *receive_and_send_to_pipe(void *arg) {
+    int sock = *((int *)arg);
+    char buffer[1024];
     int pipe_fd;
 
     // Open the pipe for writing
@@ -31,20 +56,24 @@ void *send_message(void *arg) {
     }
 
     while (1) {
-        // Read message from user input
-        printf("\nEnter a message: "); // Changed prompt
-        fgets(message, sizeof(message), stdin);
+        memset(buffer, 0, 1024);
 
-        // Send message to the server via socket
-        send(sock, message, strlen(message), 0);
-
-        // Send message to the pipe
-        write(pipe_fd, message, strlen(message));
-
-        // Check for client disconnection
-        if (strcmp(message, "exit\n") == 0) {
+        // Read message from the server
+        int valread = read(sock, buffer, 1024);
+        if (valread <= 0) {
+            printf("\nServer disconnected\n");
             break;
         }
+        printf("%s\n", buffer);
+
+        // Lock the mutex before writing to the pipe
+        pthread_mutex_lock(&pipe_mutex);
+
+        // Send received message to the pipe
+        write(pipe_fd, buffer, strlen(buffer));
+
+        // Unlock the mutex
+        pthread_mutex_unlock(&pipe_mutex);
     }
 
     // Close the pipe
@@ -107,25 +136,23 @@ int main(int argc, char const *argv[]) {
         // Envoi de l'ID au serveur
         send(sock, &client_id, sizeof(int), 0);
 
-        // Create a thread to send messages to the server and pipe
+        // Create a thread to send messages to the server
         pthread_t send_thread;
         if (pthread_create(&send_thread, NULL, send_message, (void *)&sock) != 0) {
             printf("Failed to create send thread\n");
             return -1;
         }
 
-        // Receive and print messages from the server
-        while (1) {
-            memset(buffer, 0, 1024);
-
-            // Read message from the server
-            valread = read(sock, buffer, 1024);
-            if (valread <= 0) {
-                printf("\nServer disconnected\n");
-                break;
-            }
-            printf("%s", buffer); // Changed here
+        // Create a thread to receive messages from the server and send them to the pipe
+        pthread_t receive_thread;
+        if (pthread_create(&receive_thread, NULL, receive_and_send_to_pipe, (void *)&sock) != 0) {
+            printf("Failed to create receive thread\n");
+            return -1;
         }
+
+        // Wait for both threads to finish
+        pthread_join(send_thread, NULL);
+        pthread_join(receive_thread, NULL);
 
         // Close the socket
         close(sock);

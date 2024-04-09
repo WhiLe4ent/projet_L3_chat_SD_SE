@@ -4,15 +4,15 @@ LDFLAGS=-lrt
 SERVER_PORT=8080
 PIPE_NAME=message_pipe
 
-all: client server 
+all: client server afficheur_msg
 
-client: client
+client: client.c
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
-server: server
+server: server.c
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
-afficheur_msg: afficheur_msg
+afficheur_msg: afficheur_msg.c
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 %.o: %.c
@@ -28,4 +28,7 @@ run: all
 	@echo "Launching client..."
 	@gnome-terminal -- ./client
 
+run_client: all
 
+	@echo "Launching client..."
+	@gnome-terminal -- ./client

@@ -9,25 +9,34 @@
 int main() {
     int pipe_fd;
     char pipe_buffer[1024];
-    // int client_id = -1; // Default client ID
 
-    // Open the pipe for reading
+    // Ouvrir le tube pour la lecture
     pipe_fd = open(PIPE_NAME, O_RDONLY);
     if (pipe_fd == -1) {
-        perror("Failed to open pipe");
+        perror("Échec de l'ouverture du tube");
         exit(EXIT_FAILURE);
     }
 
-    // Indicate connection in the terminal
-    printf("Afficheur message connected.\n");
+    // Indiquer la connexion dans le terminal
+    printf("Afficheur de message.\n");
 
-    // Read from the pipe and display messages
-    while (read(pipe_fd, pipe_buffer, sizeof(pipe_buffer)) != 0) {
-        // Print client ID and message
-        printf("%s", pipe_buffer);
+    // Lire à partir du tube et afficher les messages
+    while (1) {
+        ssize_t bytes_read = read(pipe_fd, pipe_buffer, sizeof(pipe_buffer));
+        if (bytes_read == -1) {
+            perror("Échec de lecture du tube");
+            break;
+        } else if (bytes_read == 0) {
+            // Le tube est fermé
+            printf("Le serveur s'est déconnecté.\n");
+            break;
+        } else {
+            // Afficher le message
+            printf("%.*s", (int)bytes_read, pipe_buffer);
+        }
     }
 
-    // Close the pipe
+    // Fermer le tube
     close(pipe_fd);
 
     return 0;
