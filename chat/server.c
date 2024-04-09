@@ -23,6 +23,7 @@ void *handle_client(void *arg) {
     int client_index = *((int*)arg);
     int client_socket = clients[client_index].socket;
     int client_id = clients[client_index].id;
+
     char buffer[1024] = {0};
 
     while (1) {
