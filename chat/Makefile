@@ -6,10 +6,10 @@ PIPE_NAME=message_pipe
 
 all: client server 
 
-client: client.o
+client: client
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
-server: server.o
+server: server
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 afficheur_msg: afficheur_msg
