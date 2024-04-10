@@ -45,6 +45,6 @@ int main(int argc, char *argv[]) {
     // // Ajouter une pause pour maintenir le terminal ouvert
     // printf("Appuyez sur Entrée pour quitter...\n");
     // getchar();
-
+    
     return 0;
 }
