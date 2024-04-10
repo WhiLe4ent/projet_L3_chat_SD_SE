@@ -4,25 +4,28 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 
-#define PIPE_NAME "message_pipe"
+int main(int argc, char *argv[]) {
+    if (argc != 2) {
+        fprintf(stderr, "Usage: %s <pipe_name>\n", argv[0]);
+        exit(EXIT_FAILURE);
+    }
 
-int main() {
     int pipe_fd;
-    char pipe_buffer[1024];
+    char pipe_buffer[2048];
 
-    // Ouvrir le tube pour la lecture
-    pipe_fd = open(PIPE_NAME, O_RDONLY);
+    // Open the pipe for reading
+    pipe_fd = open(argv[1], O_RDONLY);
     if (pipe_fd == -1) {
-        perror("Échec de l'ouverture du tube");
+        perror("Failed to open pipe");
         exit(EXIT_FAILURE);
     }
 
     // Indiquer la connexion dans le terminal
-    printf("Afficheur de message.\n");
+    printf("Afficheur de message du client %s\n", argv[1]);
 
     // Lire à partir du tube et afficher les messages
     while (1) {
-        ssize_t bytes_read = read(pipe_fd, pipe_buffer, sizeof(pipe_buffer));
+        size_t bytes_read = read(pipe_fd, pipe_buffer, sizeof(pipe_buffer));
         if (bytes_read == -1) {
             perror("Échec de lecture du tube");
             break;
@@ -39,5 +42,9 @@ int main() {
     // Fermer le tube
     close(pipe_fd);
 
+    // // Ajouter une pause pour maintenir le terminal ouvert
+    // printf("Appuyez sur Entrée pour quitter...\n");
+    // getchar();
+    
     return 0;
 }
