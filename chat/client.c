@@ -10,7 +10,8 @@
 #include <errno.h>
 
 #define PORT 8080
-#define PIPE_NAME "message_pipe"
+#define PIPE_NAME_PREFIX "message_pipe_"
+#define PIPE_NAME_SIZE 20
 
 // Mutex for pipe access
 pthread_mutex_t pipe_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -43,16 +44,23 @@ void *receive_and_send_to_pipe(void *arg) {
     char buffer[1024];
     int pipe_fd;
 
-    // Open the pipe for writing
-    pipe_fd = open(PIPE_NAME, O_WRONLY);
-    if (pipe_fd == -1) {
-        // If the pipe already exists, open it in write mode only
-        if (errno == EEXIST) {
-            pipe_fd = open(PIPE_NAME, O_WRONLY);
-        } else {
-            perror("Failed to open pipe");
-            exit(EXIT_FAILURE);
+    // Construct the pipe name with client ID
+    char pipe_name[PIPE_NAME_SIZE];
+    sprintf(pipe_name, "%s%d", PIPE_NAME_PREFIX, getpid());
+
+    if (mkfifo(pipe_name, 0666) == -1) {
+        // If the pipe already exists, do nothing
+        if (errno != EEXIST) {
+            perror("Error creating named pipe");
+            return NULL;
         }
+    }
+
+    // Open the pipe for writing
+    pipe_fd = open(pipe_name, O_WRONLY);
+    if (pipe_fd == -1) {
+        perror("Failed to open pipe");
+        exit(EXIT_FAILURE);
     }
 
     while (1) {
@@ -64,7 +72,8 @@ void *receive_and_send_to_pipe(void *arg) {
             printf("\nServer disconnected\n");
             break;
         }
-        printf("%s\n", buffer);
+        // // Printt message
+        // printf("%s\n", buffer);
 
         // Lock the mutex before writing to the pipe
         pthread_mutex_lock(&pipe_mutex);
@@ -92,23 +101,19 @@ int main(int argc, char const *argv[]) {
     printf("Enter your client ID: ");
     scanf("%d", &client_id);
 
-    // Créer le pipe nommé pour la communication avec l'afficheur de messages
-    if (mkfifo(PIPE_NAME, 0666) == -1) {
-        // If the pipe already exists, do nothing
-        if (errno != EEXIST) {
-            perror("Error creating named pipe");
-            return EXIT_FAILURE;
-        }
-    }
+    // Construct the pipe name with client ID
+    char pipe_name[PIPE_NAME_SIZE];
+    sprintf(pipe_name, "%s%d", PIPE_NAME_PREFIX, getpid());
 
-    // Fork process to launch message display
+    // Fork process to launch message display in a new terminal
     pid_t pid = fork();
 
     if (pid == -1) {
         perror("fork failed");
         exit(EXIT_FAILURE);
     } else if (pid == 0) { // Child process
-        execlp("gnome-terminal", "gnome-terminal", "--", "./afficheur_msg", ">/dev/null", "2>&1", NULL);
+        // Launch afficheur_msg in a new terminal
+        execlp("gnome-terminal", "gnome-terminal", "--", "./afficheur_msg", pipe_name, NULL);
         perror("exec failed");
         exit(EXIT_FAILURE);
     } else { // Parent process
