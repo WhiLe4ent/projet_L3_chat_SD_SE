@@ -11,29 +11,31 @@
 
 #define PORT 8080
 #define PIPE_NAME_PREFIX "message_pipe_"
-#define PIPE_NAME_SIZE 20
+#define PIPE_NAME_SIZE 100
 #define MAX_ID_LENGTH 50
 
 // Mutex for pipe access
 pthread_mutex_t pipe_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-// Struct to hold socket and client ID
+// Struct to hold socket, client ID, and connection status
 struct ThreadArgs {
     int sock;
-    int client_id;
+    char* client_id;
     int pipe_fd;
+    int *is_connected;
+    char* pipe_name;
 };
 
-// Function to send messages to the server
+
 void *send_message(void *arg) {
     struct ThreadArgs *args = (struct ThreadArgs *)arg;
     int sock = args->sock;
-    int client_id = args->client_id;
     int pipe_fd = args->pipe_fd;
+    int *is_connected = args->is_connected;
 
     char message[1024];
 
-    while (1) {
+    while (*is_connected) {
         // Read message from user input
         printf("\nEnter a message: ");
         fgets(message, sizeof(message), stdin);
@@ -64,11 +66,11 @@ void *send_message(void *arg) {
     return NULL;
 }
 
+
 // Function to receive messages from the server and send them to the pipe
 void *receive_and_send_to_pipe(void *arg) {
     struct ThreadArgs *args = (struct ThreadArgs *)arg;
     int sock = args->sock;
-    int client_id = args->client_id;
     int pipe_fd = args->pipe_fd;
 
     char buffer[1024];
@@ -95,10 +97,7 @@ void *receive_and_send_to_pipe(void *arg) {
     return NULL;
 }
 
-
-
 // -----------------------------------------------------------     MENU  FUNCTION    ------------------------------------------------------------------------------------------
-
 
 void clear_console() {
     printf("\033[2J\033[H"); // Clear the console (Linux)
@@ -111,16 +110,13 @@ void display_menu(int is_connected) {
         printf("1. Write a message\n");
         printf("2. Log out of the system\n");
         printf("3. Show list of all users\n");
-        printf("4. Create a new account\n");
-        printf("5. Delete an existing account\n");
-        printf("6. Quit the client\n");
+        printf("4. Delete an existing account\n");
+        printf("5. Quit the client\n");
     } else {
         printf("Main menu:\n");
         printf("1. Connect to the system\n");
-        printf("2. Show list of all users\n");
-        printf("3. Create a new account\n");
-        printf("4. Delete an existing account\n");
-        printf("5. Quit the client\n");
+        printf("2. Create a new account\n");
+        printf("3. Quit the client\n");
     }
     printf("Enter your choice: ");
 }
@@ -136,7 +132,8 @@ void handle_main_menu(int sock) {
     clear_console(); // Clear the console after timeout
 }
 
-void handle_connection(int sock) {
+
+char * handle_pseudo_mdp(int sock) {
     char pseudo[MAX_ID_LENGTH];
     char password[MAX_ID_LENGTH];
 
@@ -155,7 +152,10 @@ void handle_connection(int sock) {
 
     // Send the ID to the server
     send(sock, pseudo, strlen(pseudo), 0);
+    return strdup(pseudo); // Return the pseudo as a dynamically allocated string
 }
+
+
 
 void show_user_list() {
     printf("Showing list of all users...\n");
@@ -188,33 +188,18 @@ int get_choice() {
 // ------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 
-
-
-
-
-
 int main(int argc, char const *argv[]) {
     int sock = 0;
     struct sockaddr_in serv_addr;
     char buffer[1024] = {0};
-    int client_id; // ID du client
+    char* client_id = NULL; // Initialize client_id to NULL
 
     int is_connected = 0;
     int choice;
+    // Create a struct to hold socket, client ID, and pipe file descriptor
+    struct ThreadArgs args;
 
-    // Demande d'ID au lancement du client
-    printf("Enter your client ID: ");
-    scanf("%d", &client_id);
-
-    // Construct the pipe name with client ID
-    char pipe_name[PIPE_NAME_SIZE];
-    sprintf(pipe_name, "%s%d", PIPE_NAME_PREFIX, client_id);
-
-    // Create the named pipe
-    if (mkfifo(pipe_name, 0666) == -1 && errno != EEXIST) {
-        perror("Error creating named pipe");
-        return -1;
-    }
+ 
 
     while (1) {
         display_menu(is_connected);
@@ -222,79 +207,72 @@ int main(int argc, char const *argv[]) {
         
         if (is_connected) {
             switch (choice) {
+
+                // Write a message :
+                // open 2 threads to send messages and receive them 
                 case 1:{
                     // Fork process to launch message display in a new terminal
-                    pid_t pid = fork();
-
-                    if (pid == -1) {
-                        perror("fork failed");
-                        exit(EXIT_FAILURE);
-                    } else if (pid == 0) { // Child process
-                        // Launch afficheur_msg in a new terminal
-                        execlp("gnome-terminal", "gnome-terminal", "--", "./afficheur_msg", pipe_name, NULL);
-                        perror("exec failed");
-                        exit(EXIT_FAILURE);
-                    } else { // Parent process
-                        // Create a struct to hold socket, client ID, and pipe file descriptor
-                        struct ThreadArgs args;
-                        args.sock = sock;
-                        args.client_id = client_id;
-                        // Open the pipe for writing
-                        int pipe_fd = open(pipe_name, O_WRONLY);
-                        if (pipe_fd == -1) {
-                            perror("Failed to open pipe");
-                            return -1;
-                        }
-                        args.pipe_fd = pipe_fd;
-
-
-                        // Create a thread to receive messages from the server and send them to the pipe
-                        pthread_t receive_thread;
-                        if (pthread_create(&receive_thread, NULL, receive_and_send_to_pipe, (void *)&args) != 0) {
-                            printf("Failed to create receive thread\n");
-                            return -1;
-                        }
-
-                        // Create a thread to send messages to the server
-                        pthread_t send_thread;
-                        if (pthread_create(&send_thread, NULL, send_message, (void *)&args) != 0) {
-                            printf("Failed to create send thread\n");
-                            return -1;
-                        }
-
-                        // Wait for both threads to finish
-                        pthread_join(send_thread, NULL);
-                        pthread_join(receive_thread, NULL);
-
-                        // Close the socket
-                        close(sock);
-
-                        // Unlink the pipe file
-                        if (unlink(pipe_name) == -1) {
-                            perror("Error unlinking pipe");
-                            return -1;
-                        }
-                        // Handle connected menu
-                        handle_connected_menu(sock);
-                        break;
+ 
+                    // Create a struct to hold socket, client ID, and pipe file descriptor
+                    args.sock = sock;
+                    // Open the pipe for writing
+                    int pipe_fd = open(args.pipe_name, O_WRONLY);
+                    if (pipe_fd == -1) {
+                        perror("Failed to open pipe");
+                        return -1;
                     }
+                    args.pipe_fd = pipe_fd;
+                    args.is_connected = &is_connected;
+
+
+                    // Create a thread to send messages to the server
+                    pthread_t send_thread;
+                    if (pthread_create(&send_thread, NULL, send_message, (void *)&args) != 0) {
+                        printf("Failed to create send thread\n");
+                        return -1;
+                    }
+
+                    // Wait for both threads to finish
+                    pthread_join(send_thread, NULL);
+
+                    break;
+                    
                 }
                 case 2:
                     // Log out of the system
                     is_connected = 0;
+
+                    // Close the socket
+                    close(sock);
+
+                    // Unlink the pipe file
+                    if (unlink(args.pipe_name) == -1) {
+                        perror("Error unlinking pipe");
+                        return -1;
+                    }
+
                     break;
                 case 3:
                     show_user_list();
                     break;
+
                 case 4:
-                    create_new_account();
-                    break;
-                case 5:
                     delete_existing_account();
                     break;
-                case 6:
+                case 5:
                     // Quit the client
                     printf("Quitting the client...\n");
+
+                    
+                    // Close the socket
+                    close(sock);
+
+                    // Unlink the pipe file
+                    if (unlink(args.pipe_name) == -1) {
+                        perror("Error unlinking pipe");
+                        return -1;
+                    }
+
                     exit(EXIT_SUCCESS);
                     break;
                 default:
@@ -326,27 +304,76 @@ int main(int argc, char const *argv[]) {
                         return -1;
                     }
 
+
+                    // Enter pseudo and mdp
+                    client_id = handle_pseudo_mdp(sock);
+
+
+                    // Construct the pipe name with client ID
+                    char pipe_name[PIPE_NAME_SIZE];
+                    sprintf(pipe_name, "%s%s", PIPE_NAME_PREFIX, client_id);
+
+                    args.pipe_name = pipe_name ;
+
+                    // Create the named pipe
+                    if (mkfifo(pipe_name, 0666) == -1 && errno != EEXIST) {
+                        perror("Error creating named pipe");
+                        return -1;
+                    }
+
                     // Envoi de l'ID au serveur
-                    send(sock, &client_id, sizeof(int), 0);
+                    send(sock, client_id, strlen(client_id), 0);
+
+
+
+                    // Then we fork the afficheur_msg
+                    pid_t pid = fork();
+
+                    if (pid == -1) {
+                        perror("fork failed");
+                        exit(EXIT_FAILURE);
+                    } else if (pid == 0) { // Child process
+                        // Launch afficheur_msg in a new terminal
+                        execlp("gnome-terminal", "gnome-terminal", "--", "./afficheur_msg", pipe_name, NULL);
+                        perror("exec failed");
+                        exit(EXIT_FAILURE);
+                    } else { // Parent process
+
+                        args.sock = sock;
+                        args.client_id = client_id;
+                        // Open the pipe for writing
+                        int pipe_fd = open(pipe_name, O_WRONLY);
+                        if (pipe_fd == -1) {
+                            perror("Failed to open pipe");
+                            return -1;
+                        }
+                        args.pipe_fd = pipe_fd;
+                        args.is_connected = &is_connected;
+
+
+                        // Create a thread to receive messages from the server and send them to the pipe
+                        pthread_t receive_thread;
+                        if (pthread_create(&receive_thread, NULL, receive_and_send_to_pipe, (void *)&args) != 0) {
+                            printf("Failed to create receive thread\n");
+                            return -1;
+                        }
+                       
+                    }
 
 
                     // Handle connection
-                    handle_connection(sock);
                     is_connected = 1; // Mark client as connected
 
                     break;
+
                 case 2:
-                    show_user_list();
-                    break;
-                case 3:
                     create_new_account();
                     break;
-                case 4:
-                    delete_existing_account();
-                    break;
-                case 5:
+
+                case 3:
                     // Quit the client
                     printf("Quitting the client...\n");
+                    sleep(2);
                     exit(EXIT_SUCCESS);
                     break;
                 default:
