@@ -27,6 +27,9 @@ run: all
 	@sleep 1
 	@echo "Launching client..."
 	@gnome-terminal -- ./client
+	@sleep 1
+	@echo "Launching client 2..."
+	@gnome-terminal -- ./client
 
 run_client: all
 
