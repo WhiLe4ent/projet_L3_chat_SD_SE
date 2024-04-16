@@ -11,7 +11,7 @@ int main(int argc, char *argv[]) {
     }
 
     int pipe_fd;
-    char pipe_buffer[2048];
+    char pipe_buffer[2048+5];
 
     // Open the pipe for reading
     pipe_fd = open(argv[1], O_RDONLY);
