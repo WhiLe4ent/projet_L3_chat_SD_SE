@@ -4,7 +4,7 @@ LDFLAGS=-lrt
 SERVER_PORT=8080
 PIPE_NAME=message_pipe
 
-all: client server afficheur_msg
+all: ./client_chat/client ./partie_centralise/server_com/server ./client_chat/afficheur_msg
 
 client: ./client_chat/client.c
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)

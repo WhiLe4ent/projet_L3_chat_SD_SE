@@ -186,7 +186,7 @@ char * handle_pseudo_mdp(int sock) {
 
     printf("Pseudo: %s\n", pseudo);
     printf("Password: %s\n", password);
-    printf("Authentication response: %c\n", auth);
+    // printf("Authentication response: %c\n", auth);
 
     if (auth == 'T') {
         // Return the pseudo as a dynamically allocated string
@@ -247,9 +247,18 @@ void create_new_account(int sock) {
     // Remove trailing newline character from pseudo
     pseudo[strcspn(pseudo, "\n")] = '\0';
 
-    // Construct message with prefix C_ACC and pseudo
-    char msg[100]; // Adjust size as needed
-    snprintf(msg, sizeof(msg), "C_ACC %s", pseudo);
+    // Ask user for password
+    char password[50]; // Adjust size as needed
+    do {
+        printf("Enter a very strong password of at least 4 characters: ");
+        fgets(password, sizeof(password), stdin);
+        // Remove trailing newline character from password
+        password[strcspn(password, "\n")] = '\0';
+    } while (strlen(password) < 4);
+
+    // Construct message with prefix C_ACC, pseudo, and password separated by a delimiter
+    char msg[150]; // Adjust size as needed
+    snprintf(msg, sizeof(msg), "C_ACC %s#%s", pseudo, password);
 
     // Send message to server
     if (send(sock, msg, strlen(msg), 0) == -1) {
@@ -273,11 +282,21 @@ void create_new_account(int sock) {
 
         while (!valid_pseudo) {
             printf("Enter a different pseudo: ");
-            fgets(pseudo, sizeof(pseudo), stdin);
             // Remove trailing newline character from pseudo
             pseudo[strcspn(pseudo, "\n")] = '\0';
-            // Construct message without prefix
-            snprintf(msg, sizeof(msg), "%s", pseudo);
+
+            // Ask user for password
+            char password[50]; // Adjust size as needed
+            do {
+                printf("Enter a very strong password of at least 4 characters: ");
+                fgets(password, sizeof(password), stdin);
+                // Remove trailing newline character from password
+                password[strcspn(password, "\n")] = '\0';
+            } while (strlen(password) < 4);
+
+            // Construct message with pseudo, and password separated by a delimiter
+            char msg[150]; // Adjust size as needed
+            snprintf(msg, sizeof(msg), "%s#%s", pseudo, password);
             // Send message to server
             if (send(sock, msg, strlen(msg), 0) == -1) {
                 perror("Error sending pseudo to server");
@@ -289,48 +308,22 @@ void create_new_account(int sock) {
                 return;
             }
             if (response == 'V') {
-                printf("New pseudo '%s' accepted.\n", pseudo);
+                printf("New account '%s' created.\n", pseudo);
                 valid_pseudo = true;
             } else {
                 printf("Pseudo '%s' is already in use. Please choose another one.\n", pseudo);
             }
         }
+    }else {
+        printf("New account '%s' created.\n", pseudo);
+        printf("Pseudo : %s\nPassword : %s\n", pseudo, password);
     }
 
-    // Ask user for password
-    char password[50]; // Adjust size as needed
-    do {
-        printf("Enter a very strong password of at least 4 characters: ");
-        fgets(password, sizeof(password), stdin);
-        // Remove trailing newline character from password
-        password[strcspn(password, "\n")] = '\0';
-    } while (strlen(password) < 4);
-
-    // Send password to server
-    if (send(sock, password, strlen(password), 0) == -1) {
-        perror("Error sending password to server");
-        return;
-    }
-
-    char conf;
-    // Receive response from server
-    if (recv(sock, &conf, sizeof(conf), 0) <= 0) {
-        perror("Problem receiving response from server");
-        return;
-    }
-    
-    if (conf == 'V'){
-        printf("Account created successfully!\n");
-    }else{
-        perror("Error creating your account\n");
-    }
 
     // Wait for user input before returning
     printf("Press Enter to continue...");
     getchar(); // Wait for user to press Enter
 }
-
-
 
 
 

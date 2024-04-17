@@ -1,16 +1,18 @@
 package com.example ;
 
 import java.io.*;
+import java.net.MalformedURLException;
+import java.rmi.Naming;
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.HashMap;
 import java.util.Map;
 
-public class CompteImpl extends UnicastRemoteObject implements ICompte {
-    private Map<String, String> comptes; // pseudo -> mot de passe
-    private String fichierComptes; // Nom du fichier pour stocker les comptes
+public class Gestion_compte extends UnicastRemoteObject implements ICompte {
+    private final Map<String, String> comptes; // pseudo -> mot de passe
+    private final String fichierComptes; // Nom du fichier pour stocker les comptes
 
-    protected CompteImpl(String fichierComptes) throws RemoteException {
+    protected Gestion_compte(String fichierComptes) throws RemoteException {
         super();
         this.fichierComptes = fichierComptes;
         this.comptes = new HashMap<>();
@@ -39,7 +41,6 @@ public class CompteImpl extends UnicastRemoteObject implements ICompte {
                 fichier.createNewFile();
             }
         } catch (IOException e) {
-            e.printStackTrace();
         }
     }
 
@@ -50,7 +51,6 @@ public class CompteImpl extends UnicastRemoteObject implements ICompte {
                 bw.newLine();
             }
         } catch (IOException e) {
-            e.printStackTrace();
         }
     }
 
@@ -66,8 +66,15 @@ public class CompteImpl extends UnicastRemoteObject implements ICompte {
         }
     }
 
+    /**
+     *
+     * @param pseudo
+     * @param mdp
+     * @return
+     * @throws RemoteException
+     */
     @Override
-    public boolean supprimerCompte(String pseudo, String mdp) throws RemoteException {
+    public boolean supprimerCompter(String pseudo, String mdp) throws RemoteException {
 
         if (comptes.containsKey(pseudo) && comptes.get(pseudo).equals(mdp)) {
             comptes.remove(pseudo);
@@ -86,12 +93,14 @@ public class CompteImpl extends UnicastRemoteObject implements ICompte {
 
     public static void main(String[] args) {
         try {
-            CompteImpl compte = new CompteImpl("comptes.txt");
+            Gestion_compte compte = new Gestion_compte("comptes.txt");
             // Publiez l'objet RMI dans le registre RMI ici
             Naming.rebind("Compte", compte);
             System.out.println("Serveur Compte prêt.");
-        } catch (Exception e) {
+        } catch (MalformedURLException | RemoteException e) {
             System.err.println("Erreur : " + e);
         }
     }
+
+
 }

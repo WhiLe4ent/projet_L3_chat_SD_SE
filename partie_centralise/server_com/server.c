@@ -179,17 +179,18 @@ void *handle_client(void *arg) {
                 // Create Account 
                 case 'C':
                     if (strcmp(type_msg, "C_ACC") == 0) { //------------------------  Create Account  ---------------------------------------
-                        // Create Account
-                        // Implement your logic here
-
-                        // Receive pseudo from client
+                        // Receive pseudo and password from client
                         char pseudo[50]; // Adjust size as needed
+                        char password[50]; // Adjust size as needed
 
-                        strcpy(pseudo, message_content);
+                        // Extract pseudo and password from the message_content
+                        sscanf(message_content, "%49[^#]#%49s", pseudo, password);
 
+                        printf("Pseudo : %s\nPassword : %s\n", pseudo, password);
 
-                        // Check if pseudo is already in use
-                        bool pseudo_in_use = false; 
+                        // Check if the pseudo is already in use
+                        bool pseudo_in_use = false; // Implement your logic to check if the pseudo is in use
+
                         if (pseudo_in_use) {
                             // Send response to client indicating pseudo is already in use
                             char response = 'U';
@@ -200,30 +201,24 @@ void *handle_client(void *arg) {
 
                             // Loop until a valid pseudo is received
                             while (pseudo_in_use) {
-                                // Receive new pseudo from client
-                                if (recv(client_socket, pseudo, sizeof(pseudo), 0) <= 0) {
-                                    perror("Error receiving pseudo from client");
+                                // Receive new pseudo and password from client
+                                if (recv(client_socket, message_content, sizeof(message_content), 0) <= 0) {
+                                    perror("Error receiving pseudo and password from client");
                                     break;
                                 }
 
-                                // Check if the new pseudo is in use
-                               
+                                // Extract pseudo and password from the message_content
+                                sscanf(message_content, "%49[^#]#%49s", pseudo, password);
 
-                                // If pseudo is not in use, send response to client indicating acceptance
-                                if (!pseudo_in_use) {
-                                    char response = 'V';
-                                    if (send(client_socket, &response, sizeof(response), 0) == -1) {
-                                        perror("Error sending response to client");
-                                        break;
-                                    }
-                                } else {
-                                    // If pseudo is still in use, send response indicating it's in use
-                                    char response = 'U';
-                                    if (send(client_socket, &response, sizeof(response), 0) == -1) {
-                                        perror("Error sending response to client");
-                                        break;
-                                    }
-                                }
+                                // Check if the new pseudo is in use
+                                // Update pseudo_in_use variable accordingly
+                            }
+
+                            // If pseudo is not in use, send response to client indicating acceptance
+                            response = 'V';
+                            if (send(client_socket, &response, sizeof(response), 0) == -1) {
+                                perror("Error sending response to client");
+                                break;
                             }
                         } else {
                             // Send response to client indicating acceptance of the pseudo
@@ -234,22 +229,8 @@ void *handle_client(void *arg) {
                             }
                         }
 
-                        // Receive password from client
-                        char password[50]; // Adjust size as needed
-                        if (recv(client_socket, password, sizeof(password), 0) <= 0) {
-                            perror("Error receiving password from client");
-                            break;
-                        }
-
                         // Create the account
-
-                        // Send confirmation message to client
-                        char confirm_msg = 'V'; // 'V' for confirmation and 'F' if failed
-                        if (send(client_socket, &confirm_msg, sizeof(confirm_msg), 0) == -1) {
-                            perror("Error sending confirmation message to client");
-                            break;
-                        }
-                    
+                        // Implement your logic to create the account with the received pseudo and password
 
                     } else {
                         printf("Unknown message type: %s\n", type_msg);
