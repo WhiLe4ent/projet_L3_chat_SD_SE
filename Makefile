@@ -6,13 +6,13 @@ PIPE_NAME=message_pipe
 
 all: client server afficheur_msg
 
-client: client.c
+client: ./client_chat/client.c
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
-server: server.c
+server: ./partie_centralise/server_com/server.c
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
-afficheur_msg: afficheur_msg.c
+afficheur_msg: ./client_chat/afficheur_msg.c
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 %.o: %.c
@@ -23,15 +23,15 @@ clean:
 
 run: all
 	@echo "Launching server..."
-	@gnome-terminal -- ./server $(SERVER_PORT) &
+	@gnome-terminal -- ./partie_centralise/server_com/server $(SERVER_PORT) &
 	@sleep 1
 	@echo "Launching client..."
-	@gnome-terminal -- ./client
+	@gnome-terminal -- ./client_chat/client
 	@sleep 1
 	@echo "Launching client 2..."
-	@gnome-terminal -- ./client
+	@gnome-terminal -- ./client_chat/client
 
 run_client: all
 
 	@echo "Launching client..."
-	@gnome-terminal -- ./client
+	@gnome-terminal -- ./client_chat/client
