@@ -19,7 +19,7 @@ afficheur_msg: ./client_chat/afficheur_msg.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 clean:
-	rm -f *.o client server 
+	rm -f *.o ./client_chat/client ./partie_centralise/server_com/server ./client_chat/message_pipe_* ./client_chat/afficheur_msg
 
 run: all
 	@echo "Launching server..."
