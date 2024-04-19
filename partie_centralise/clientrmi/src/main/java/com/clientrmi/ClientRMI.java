@@ -1,6 +1,12 @@
-package com.clientrmi;
+package com.clientrmi ;
 
 import com.gestion_compte.ICompte;
+
+import java.io.IOException;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
+import java.net.SocketException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.RemoteException;
@@ -15,10 +21,10 @@ public class ClientRMI {
             int serverPort = 1099; // Port par défaut
             try {
                 if (System.getSecurityManager() == null) {
-                  System.setSecurityManager(new CustomSecurityManager());
+                    System.setSecurityManager(new CustomSecurityManager());
                 }
-              } catch (Exception e) {
-              }
+            } catch (Exception e) {
+            }
 
             // Obtention du registre RMI du serveur
             Registry registry = LocateRegistry.getRegistry(serverIP, serverPort);
@@ -26,26 +32,75 @@ public class ClientRMI {
             // Recherche du stub de l'objet distant du serveur
             ICompte gestionCompte = (ICompte) registry.lookup("GestionCompte");
 
-            // Appel de la méthode pour créer un compte
-            boolean result = gestionCompte.creerCompte("nouveauPseudo", "nouveauMDP");
-            
-            // Affichage du résultat
-            if(result) {
-                System.out.println("Compte créé avec succès.");
-            } else {
-                System.out.println("Échec de la création du compte.");
-            }
+            // Démarrer un thread pour écouter les messages UDP
+            new Thread(() -> {
+                try {
+                    // Créer un socket UDP pour écouter les messages
+                    DatagramSocket socket = new DatagramSocket(4003); // Port arbitraire
+
+                    byte[] buffer = new byte[2048 + 5];
+
+                    while (true) {
+                        DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
+                        socket.receive(packet);
+
+                        // Extraire le message reçu
+                        String message = new String(packet.getData(), 0, packet.getLength());
+
+                        // Traiter le message
+                        String action = message.substring(0, 5);
+                        String[] parts = message.substring(6).split("#");
+                        String pseudo = parts[0];
+                        String mdp = parts[1];
+                        Boolean result = false;
+
+                        // Exécuter l'action en fonction des 5 premiers caractères du message
+                        switch (action) {
+                            case "C_ACC":
+                                result = gestionCompte.creerCompte(pseudo, mdp);
+                                break;
+                            case "A_ACC":
+                                result = gestionCompte.connexion(pseudo, mdp);
+                                break;
+                            case "D_ACC":
+                                result = gestionCompte.supprimerCompte(pseudo, mdp);
+                                System.out.println("Compte " + (result ? "créé" : "non créé"));
+
+                                break;
+                            default:
+                                System.out.println("Action non reconnue : " + action);
+                                break;
+                        }
+
+                        // Préparer la réponse
+                        String response = result ? "Success" : "Failed";
+                        byte[] responseData = response.getBytes();
+
+                        // Envoyer la réponse au serveur C via UDP
+                        InetAddress clientAddress = packet.getAddress();
+                        int clientPort = packet.getPort();
+                        DatagramPacket responsePacket = new DatagramPacket(responseData, responseData.length, clientAddress, clientPort);
+                        socket.send(responsePacket);
+
+                        System.out.println("Réponse envoyée au serveur C : " + response);
+                    }
+                } catch (SocketException e) {
+                    e.printStackTrace();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }).start();
+
 
         } catch (RemoteException e) {
             System.err.println("Erreur RemoteException : " + e.getMessage());
-            
+
         } catch (java.rmi.NotBoundException e) {
             System.err.println("Erreur NotBoundException : " + e.getMessage());
-            
+
         } catch (Exception e) {
             System.err.println("Erreur inattendue : " + e.getMessage());
-            
+
         }
     }
 }
-
