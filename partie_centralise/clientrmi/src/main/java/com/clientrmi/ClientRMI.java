@@ -1,5 +1,6 @@
-package src.main.java.com.clientrmi;
+package com.clientrmi;
 
+import com.gestion_compte.ICompte;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.RemoteException;
@@ -17,7 +18,6 @@ public class ClientRMI {
                   System.setSecurityManager(new CustomSecurityManager());
                 }
               } catch (Exception e) {
-                 e.printStackTrace();
               }
 
             // Obtention du registre RMI du serveur
@@ -38,13 +38,13 @@ public class ClientRMI {
 
         } catch (RemoteException e) {
             System.err.println("Erreur RemoteException : " + e.getMessage());
-            e.printStackTrace();
+            
         } catch (java.rmi.NotBoundException e) {
             System.err.println("Erreur NotBoundException : " + e.getMessage());
-            e.printStackTrace();
+            
         } catch (Exception e) {
             System.err.println("Erreur inattendue : " + e.getMessage());
-            e.printStackTrace();
+            
         }
     }
 }

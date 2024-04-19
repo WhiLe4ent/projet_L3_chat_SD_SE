@@ -7,6 +7,7 @@
   <groupId>com.gestion_compte</groupId>
   <artifactId>gestion_compte</artifactId>
   <version>1.0-SNAPSHOT</version>
+  <packaging>jar</packaging>
 
   <name>gestion_compte</name>
   <!-- FIXME change it to the project's website -->
@@ -16,6 +17,7 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <maven.compiler.source>11</maven.compiler.source>
     <maven.compiler.target>11</maven.compiler.target>
+    <exec.MainClass>gestion_compte.src.main.java.gestion_compte.GestionCompte</exec.MainClass>
   </properties>
 
   <dependencies>

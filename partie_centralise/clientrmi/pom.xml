@@ -13,4 +13,14 @@
         <maven.compiler.target>11</maven.compiler.target>
     </properties>
 
+    <dependencies>
+    <!-- Dépendance vers le projet contenant ICompte et GestionCompte -->
+        <dependency>
+            <groupId>com.gestion_compte</groupId>
+            <artifactId>gestion_compte</artifactId>
+            <version>1.0-SNAPSHOT</version>
+            <type>jar</type>
+        </dependency>
+    </dependencies>
+
 </project>

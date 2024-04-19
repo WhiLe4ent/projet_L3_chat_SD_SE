@@ -1,4 +1,4 @@
-package src.main.java.com.clientrmi;
+package com.clientrmi;
 
 
 
