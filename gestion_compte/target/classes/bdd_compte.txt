@@ -1,0 +1,5 @@
+nouveauPseudo#nouveauMDP
+pseudo#mdp
+Achille#yolo
+mateo#molo
+baptou#molo

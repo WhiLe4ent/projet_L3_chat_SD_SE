@@ -49,22 +49,30 @@ public class ClientRMI {
 
                         // Traiter le message
                         String action = message.substring(0, 5);
-                        String[] parts = message.substring(6).split("#");
+                        System.out.println("Action :  " + action);
+
+                        String[] parts = message.substring(5).split("#");
                         String pseudo = parts[0];
+                        System.out.println("Reçu pseudo : " + pseudo);
+
                         String mdp = parts[1];
+                        System.out.println("Reçu mdp : " + mdp);
+
                         Boolean result = false;
 
                         // Exécuter l'action en fonction des 5 premiers caractères du message
                         switch (action) {
                             case "C_ACC":
                                 result = gestionCompte.creerCompte(pseudo, mdp);
+                                System.out.println("Compte " + (result ? "créé" : "non créé"));
                                 break;
                             case "A_ACC":
                                 result = gestionCompte.connexion(pseudo, mdp);
+                                System.out.println((result ? "Connecté bv chef" : "Pas connecté chef"));
                                 break;
                             case "D_ACC":
                                 result = gestionCompte.supprimerCompte(pseudo, mdp);
-                                System.out.println("Compte " + (result ? "créé" : "non créé"));
+                                System.out.println("Compte " + (result ? "supprimer" : "non supprimé"));
 
                                 break;
                             default:
