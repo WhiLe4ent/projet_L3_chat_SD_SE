@@ -5,14 +5,24 @@
 #include <arpa/inet.h>
 #include <pthread.h>
 #include <stdbool.h>
+#include <fcntl.h> // Pour les constantes de mode d'ouverture des pipes
+#include <sys/stat.h> // Pour la fonction mkfifo
 
 #define PORT 8080
 #define MAX_CLIENTS 10 // Maximum number of clients
 #define MAX_ID_LENGTH 50 // Maximum length of client ID
 
+// Déclarer le pipe nommé comme une variable globale
+char *pipe_name = "../file_com";
+
+
+
+
+
 // Structure to hold client information
 typedef struct {
     char id[MAX_ID_LENGTH];
+    pthread_t thread_id;
     int socket;
 } Client;
 
@@ -29,11 +39,22 @@ void *handle_client(void *arg) {
 
     char buffer[2048 + 5] = {0};
 
+    // Open the named pipe for reading and writing
+    int pipe_fd = open(pipe_name, O_RDWR);
+    if (pipe_fd == -1) {
+        perror("open");
+        close(client_socket);
+        pthread_exit(NULL);
+    }
+
+    pthread_t thread_id = pthread_self(); // Get the ID of the current thread
+
     while (1) {
         memset(buffer, 0, sizeof(buffer));
 
         // Read data from client
         int valread = read(client_socket, buffer, sizeof(buffer));
+
 
         if (valread <= 0) {
             // Client disconnected or error occurred
@@ -53,6 +74,13 @@ void *handle_client(void *arg) {
             pthread_exit(NULL);
         }
 
+
+        // // Écrire le message dans le pipe avec l'ID du thread
+        // char message_with_thread_id[2053]; // Augmenter la taille si nécessaire
+        // snprintf(message_with_thread_id, sizeof(message_with_thread_id), "%lu:%s", thread_id, buffer);
+
+
+
         printf("Message from client %s: %s\n", client_id, buffer);
 
         char type_msg[6]; // Increase size by 1 for null terminator
@@ -67,37 +95,35 @@ void *handle_client(void *arg) {
         printf("Msg_content : %s\n", message_content);
 
 
-        if (strcmp(type_msg, "A_ACC") == 0) { // Authentication
+        if (strcmp(type_msg, "A_ACC") == 0) { // -------------------------------------------------  Authentication   --------------------------------------------------------
             printf("Authentication\n");
 
             sprintf(client_id, "%s", message_content);
 
-            // Send authentication acknowledge back to the client
-            // After receiving the pseudo, send an acknowledgment back to the client
-            char ack = 'A';
-            if (send(client_socket, &ack, sizeof(ack), 0) == -1) {
-                perror("Error sending acknowledgment to client");
-                close(client_socket);
-                pthread_exit(NULL);
-            }
-
-            // Wait to receive client password1
-
-            char password[50]; // Adjust 50 as needed
-            if (recv(client_socket, password, 50, 0) <= 0) {
-                perror("recv failed");
-                close(client_socket);
-                pthread_exit(NULL);
-            }
-            printf("Password: %s\n", password);
-
-            
+ 
             // Authentication here
+            if (write(pipe_fd, buffer, strlen(buffer)) == -1) {
+                perror("write to pipe");
+                close(client_socket);
+                pthread_exit(NULL);
+            }
+
 
             
 
             // For now it's always good
-            char valid = 'T';
+            char valid[2053] ; // = 'T';
+
+            // Read response from the pipe
+            // memset(buffer, 0, sizeof(buffer));
+            if (read(pipe_fd, valid, sizeof(valid)) == -1) {
+                perror("read from pipe");
+                close(client_socket);
+                close(pipe_fd);
+                pthread_exit(NULL);
+            }
+
+
             if (send(client_socket, &valid, sizeof(valid), 0) == -1) {
                 perror("Error sending authentication response to client");
                 close(client_socket);
@@ -105,23 +131,18 @@ void *handle_client(void *arg) {
             }
 
 
-            if (valid == 'T'){
-
-                // Store the client information
-                if (num_clients < MAX_CLIENTS) {
-                    strcpy(clients[num_clients].id, client_id);
-                    clients[num_clients].socket = client_socket;
-                    num_clients++;
-                    printf("Client %s connected\n", client_id);
-                } else {
-                    printf("Max clients reached. Rejecting connection from client %s.\n", client_id);
-                    close(client_socket);
-                    pthread_exit(NULL);
-                }   
-            }else{
+            // Store the client information
+            if (num_clients < MAX_CLIENTS) {
+                strcpy(clients[num_clients].id, client_id);
+                clients[num_clients].socket = client_socket;
+                num_clients++;
+                printf("Client %s connected\n", client_id);
+            } else {
+                printf("Max clients reached. Rejecting connection from client %s.\n", client_id);
                 close(client_socket);
                 pthread_exit(NULL);
-            }
+            }   
+
 
 
         } else { 
@@ -188,50 +209,23 @@ void *handle_client(void *arg) {
 
                         printf("Pseudo : %s\nPassword : %s\n", pseudo, password);
 
-                        // Check if the pseudo is already in use
-                        bool pseudo_in_use = false; // Implement your logic to check if the pseudo is in use
+                        // Check if possible
+                        // Transfer the message to the pipe
 
-                        if (pseudo_in_use) {
-                            // Send response to client indicating pseudo is already in use
-                            char response = 'U';
-                            if (send(client_socket, &response, sizeof(response), 0) == -1) {
-                                perror("Error sending response to client");
-                                break;
-                            }
+                        // we receive the response 
+                        char *response = "Success" ; // Implement here we are supposed to get the response from the pipe
 
-                            // Loop until a valid pseudo is received
-                            while (pseudo_in_use) {
-                                // Receive new pseudo and password from client
-                                if (recv(client_socket, message_content, sizeof(message_content), 0) <= 0) {
-                                    perror("Error receiving pseudo and password from client");
-                                    break;
-                                }
 
-                                // Extract pseudo and password from the message_content
-                                sscanf(message_content, "%49[^#]#%49s", pseudo, password);
-
-                                // Check if the new pseudo is in use
-                                // Update pseudo_in_use variable accordingly
-                            }
-
-                            // If pseudo is not in use, send response to client indicating acceptance
-                            response = 'V';
-                            if (send(client_socket, &response, sizeof(response), 0) == -1) {
-                                perror("Error sending response to client");
-                                break;
-                            }
-                        } else {
-                            // Send response to client indicating acceptance of the pseudo
-                            char response = 'V';
-                            if (send(client_socket, &response, sizeof(response), 0) == -1) {
-                                perror("Error sending response to client");
-                                break;
-                            }
+                        // Send response to client 
+                        
+                        if (send(client_socket, &response, sizeof(response), 0) == -1) {
+                            perror("Error sending response to client");
+                            break;
                         }
 
-                        // Create the account
-                        // Implement your logic to create the account with the received pseudo and password
 
+
+                        
                     } else {
                         printf("Unknown message type: %s\n", type_msg);
                     }
@@ -252,21 +246,19 @@ void *handle_client(void *arg) {
                         printf("Pseudo : %s\nPassword : %s\n", pseudo, password);
 
                         
-                        char conf = 'y';
-                        if (conf == 'y' || conf == 'Y') {
-                            // Delete account
+                        // Delete account
 
-                            // Dummy response 
-                            char response = 'Y';
-                            if (send(client_socket, &response, sizeof(response), 0) == -1) {
-                                perror("Error sending account deletion success response to client");
-                                break;
-                            }
-                        } else {
-                            
-                            printf("Cancel deleting account...");
-                            getchar();
+                        // Implement here to send to the pipe
+
+                        // Dummy response (We should receive the response from the pipe)
+                        char response = 'Y';
+
+
+                        if (send(client_socket, &response, sizeof(response), 0) == -1) {
+                            perror("Error sending account deletion success response to client");
+                            break;
                         }
+   
 
                     } else {
                         printf("Unknown message type: %s\n", type_msg);
@@ -289,6 +281,13 @@ int main(int argc, char const *argv[]) {
     struct sockaddr_in address;
     int opt = 1;
     int addrlen = sizeof(address);
+    
+    // Create the named pipe
+    if (mkfifo(pipe_name, 0666) == -1) {
+        perror("mkfifo");
+        exit(EXIT_FAILURE);
+    }
+
 
     // Create server socket
     if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {

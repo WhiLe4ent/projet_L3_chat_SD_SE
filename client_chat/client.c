@@ -152,44 +152,30 @@ char * handle_pseudo_mdp(int sock) {
     }
     password[strcspn(password, "\n")] = '\0'; // Remove newline character
 
+
+
     // Send pseudo with prefix A_ACC to the server
-    char pseudo_serv[MAX_ID_LENGTH + 5];
-    sprintf(pseudo_serv, "A_ACC%s", pseudo);
+    char pseudo_serv[MAX_ID_LENGTH *2 + 6];
+    sprintf(pseudo_serv, "A_ACC%s#%s", pseudo, password);
     if (send(sock, pseudo_serv, strlen(pseudo_serv), 0) == -1) {
         perror("Error sending pseudo to server");
         return NULL;
     }
 
-    // After sending the pseudo, wait for acknowledgment from the server
-    char ack;
-    if (recv(sock, &ack, sizeof(ack), 0) <= 0) {
-        perror("Error receiving acknowledgment from server");
-        return NULL;
-    }
-    if (ack != 'A') {
-        printf("Server did not acknowledge pseudo.\n");
-        return NULL;
-    }
-
-    // Send password to the server
-    if (send(sock, password, strlen(password), 0) == -1) {
-        perror("Error sending password to server");
-        return NULL;
-    }
 
     // Wait for authentication response from the server
-    char auth;
+    char auth[2053];
     if (recv(sock, &auth, sizeof(auth), 0) <= 0) {
         perror("Error receiving authentication response from server");
         return NULL;
     }
 
-    printf("Pseudo: %s\n", pseudo);
-    printf("Password: %s\n", password);
-    // printf("Authentication response: %c\n", auth);
 
-    if (auth == 'T') {
+    if (strcmp(auth, "Success") == 0) {
         // Return the pseudo as a dynamically allocated string
+        printf("Pseudo: %s\n", pseudo);
+        printf("Password: %s\n", password);
+        // printf("Authentication response: %c\n", auth);
         return strdup(pseudo);
     } else {
         return NULL; 
@@ -570,10 +556,6 @@ int main(int argc, char const *argv[]) {
                         return -1;
                     }
 
-                    // Envoi de l'ID au serveur
-                    // send(sock, client_id, strlen(client_id), 0);
-
-
 
                     // Then we fork the afficheur_msg
                     pid_t pid = fork();
@@ -583,9 +565,9 @@ int main(int argc, char const *argv[]) {
                         exit(EXIT_FAILURE);
                     } else if (pid == 0) { // Child process
                         // Launch afficheur_msg in a new terminal
-                        execlp("gnome-terminal", "gnome-terminal", "--", "./client_chat/afficheur_msg", pipe_name, NULL);
-                        perror("exec failed");
-                        exit(EXIT_FAILURE);
+                        execlp("gnome-terminal", "gnome-terminal", "--", "../client_chat/afficheur_msg", pipe_name, NULL);
+                        // perror("exec failed");
+                        // exit(EXIT_FAILURE);
                     } else { // Parent process
 
                         args.sock = sock;
