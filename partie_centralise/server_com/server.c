@@ -17,6 +17,14 @@ char *pipe_name = "../file_com";
 
 
 
+int count_digits(unsigned long num) {
+    int count = 0;
+    while (num != 0) {
+        num /= 10;
+        count++;
+    }
+    return count;
+}
 
 
 // Structure to hold client information
@@ -34,10 +42,10 @@ int num_clients = 0; // Number of connected clients
 // Function to handle each client connection
 void *handle_client(void *arg) {
     int client_socket = *((int *)arg);
-    char client_id[MAX_ID_LENGTH];
+    char client_id[MAX_ID_LENGTH] = {0};
     int index = -1;
 
-    char buffer[2048 + 5] = {0};
+    char buffer[2048 + 5 + 100] = {0};
 
     // Open the named pipe for reading and writing
     int pipe_fd = open(pipe_name, O_RDWR);
@@ -49,9 +57,11 @@ void *handle_client(void *arg) {
 
     pthread_t thread_id = pthread_self(); // Get the ID of the current thread
 
+
     while (1) {
         memset(buffer, 0, sizeof(buffer));
 
+        printf("blablabla\n");
         // Read data from client
         int valread = read(client_socket, buffer, sizeof(buffer));
 
@@ -79,9 +89,9 @@ void *handle_client(void *arg) {
         // char message_with_thread_id[2053]; // Augmenter la taille si nécessaire
         // snprintf(message_with_thread_id, sizeof(message_with_thread_id), "%lu:%s", thread_id, buffer);
 
-
-
         printf("Message from client %s: %s\n", client_id, buffer);
+
+
 
         char type_msg[6]; // Increase size by 1 for null terminator
         strncpy(type_msg, buffer, 5);
@@ -92,57 +102,100 @@ void *handle_client(void *arg) {
         strncpy(message_content, buffer + 5, valread - 5);
         message_content[valread - 5] = '\0'; // Null-terminate the string
 
-        printf("Msg_content : %s\n", message_content);
 
+
+        char tid_char[20] ;
+        int thread_id_length = snprintf(tid_char, sizeof(tid_char), "%lu", thread_id);
+
+
+        printf("Msg_content : %s\n", message_content);
+        printf("TID : %lu\n", thread_id);
+        printf("TID : %d\n", thread_id_length);
+        printf("TID : %s\n", tid_char);
+
+
+        size_t total_length = strlen(buffer) + strlen(tid_char) + 1; // +1 pour le caractère nul
+
+        char message[2053 + 50 ];
+        snprintf(message, total_length +1, "%s#%s%s", tid_char, type_msg, message_content); // +1 pour le #
+
+
+
+        // Ajoutez le caractère nul à la fin de la chaîne buffer
+        // buffer[total_length - 1] = '\0';
+        printf("Message with tid : %s\n", message);
+        printf("message_content : %s\n", message_content);
 
         if (strcmp(type_msg, "A_ACC") == 0) { // -------------------------------------------------  Authentication   --------------------------------------------------------
             printf("Authentication\n");
 
-            sprintf(client_id, "%s", message_content);
 
- 
+
             // Authentication here
-            if (write(pipe_fd, buffer, strlen(buffer)) == -1) {
+            if (write(pipe_fd, message, strlen(message)) == -1) {
                 perror("write to pipe");
                 close(client_socket);
                 pthread_exit(NULL);
             }
 
 
-            
-
             // For now it's always good
             char valid[2053] ; // = 'T';
-
-            // Read response from the pipe
-            // memset(buffer, 0, sizeof(buffer));
-            if (read(pipe_fd, valid, sizeof(valid)) == -1) {
-                perror("read from pipe");
-                close(client_socket);
-                close(pipe_fd);
-                pthread_exit(NULL);
-            }
+            char tid_verif[2053] ; 
 
 
-            if (send(client_socket, &valid, sizeof(valid), 0) == -1) {
-                perror("Error sending authentication response to client");
-                close(client_socket);
-                pthread_exit(NULL);
-            }
+            do {
 
+                // Lire la réponse du pipe
+                if (read(pipe_fd, valid, sizeof(valid)) == -1) {
+                    perror("read from pipe");
+                    close(client_socket);
+                    close(pipe_fd);
+                    pthread_exit(NULL);
+                }
 
-            // Store the client information
-            if (num_clients < MAX_CLIENTS) {
-                strcpy(clients[num_clients].id, client_id);
-                clients[num_clients].socket = client_socket;
-                num_clients++;
-                printf("Client %s connected\n", client_id);
-            } else {
-                printf("Max clients reached. Rejecting connection from client %s.\n", client_id);
-                close(client_socket);
-                pthread_exit(NULL);
-            }   
+                printf("Initial response %s\n", valid);
 
+                // Extraire l'identifiant du thread de la réponse
+                strcpy(tid_verif, strtok(valid, "#"));
+                char* response = strtok(NULL, "");
+
+                printf("Thread response %s\n", tid_verif);
+
+                // Vérifier si l'identifiant du thread reçu correspond à l'identifiant du thread actuel
+                if (strcmp(tid_verif, tid_char) == 0) {
+                    // Les identifiants de thread correspondent, traiter la réponse
+
+                    printf("Response %s\n", response);
+                    // Envoyer la réponse au client (deuxième partie de valid)
+                    if (send(client_socket, response, strlen(response), 0) == -1) {
+                        perror("Error sending authentication response to client");
+                        close(client_socket);
+                        pthread_exit(NULL);
+                    }
+                    // Extraire le client_id de la première partie de message_content
+                    strcpy(client_id , strtok(message_content, "#"));
+                    printf("Client_id : %s\n", client_id);
+
+                    // Stocker les informations du client
+                    if (num_clients < MAX_CLIENTS) {
+                        strcpy(clients[num_clients].id, client_id);
+                        clients[num_clients].socket = client_socket;
+                        num_clients++;
+                        printf("Client %s connected\n", client_id);
+                    } else {
+                        printf("Max clients reached. Rejecting connection from client %s.\n", client_id);
+                        close(client_socket);
+                        pthread_exit(NULL);
+                    }   
+                } else {
+                    // Les identifiants de thread ne correspondent pas, continuer à lire jusqu'à ce que ce soit le bon thread
+                    printf("Received response from wrong thread. Waiting for correct thread...\n");
+                }
+                // free(response);
+            } while (strcmp(tid_verif, tid_char) != 0);
+
+            printf("That's done... Let's see\n");
 
 
         } else { 
@@ -210,20 +263,52 @@ void *handle_client(void *arg) {
                         printf("Pseudo : %s\nPassword : %s\n", pseudo, password);
 
                         // Check if possible
-                        // Transfer the message to the pipe
-
-                        // we receive the response 
-                        char *response = "Success" ; // Implement here we are supposed to get the response from the pipe
-
-
-                        // Send response to client 
-                        
-                        if (send(client_socket, &response, sizeof(response), 0) == -1) {
-                            perror("Error sending response to client");
-                            break;
+                                    
+            
+                        // Send to file_msg here
+                        if (write(pipe_fd, message, strlen(message)) == -1) {
+                            perror("write to pipe");
+                            close(client_socket);
+                            pthread_exit(NULL);
                         }
 
 
+                        // For now it's always good
+                        // char response[2053] ; // = 'T';
+
+                        char valid[2053] ; // = 'T';
+                        char tid_verif[2053] ; 
+                       do {
+
+                            // Lire la réponse du pipe
+                            if (read(pipe_fd, valid, sizeof(valid)) == -1) {
+                                perror("read from pipe");
+                                close(client_socket);
+                                close(pipe_fd);
+                                pthread_exit(NULL);
+                            }
+
+                            // Extraire l'identifiant du thread de la réponse
+                            strcpy(tid_verif, strtok(valid, "#"));
+                            char* response = strtok(NULL, "");
+
+
+                            // Vérifier si l'identifiant du thread reçu correspond à l'identifiant du thread actuel
+                            if (strcmp(tid_verif, tid_char) == 0) {
+                                // Les identifiants de thread correspondent, traiter la réponse
+
+                                // Envoyer la réponse au client (deuxième partie de valid)
+                                if (send(client_socket, response, strlen(response), 0) == -1) {
+                                    perror("Error sending create account response to client");
+                                    close(client_socket);
+                                    pthread_exit(NULL);
+                                }
+
+                            } else {
+                                // Les identifiants de thread ne correspondent pas, continuer à lire jusqu'à ce que ce soit le bon thread
+                                printf("Received response from wrong thread. Waiting for correct thread...\n");
+                            }
+                        } while (strcmp(tid_verif, tid_char) != 0);
 
                         
                     } else {
@@ -245,19 +330,50 @@ void *handle_client(void *arg) {
 
                         printf("Pseudo : %s\nPassword : %s\n", pseudo, password);
 
-                        
                         // Delete account
 
-                        // Implement here to send to the pipe
-
-                        // Dummy response (We should receive the response from the pipe)
-                        char response = 'Y';
-
-
-                        if (send(client_socket, &response, sizeof(response), 0) == -1) {
-                            perror("Error sending account deletion success response to client");
-                            break;
+                        // Send to file_msg here
+                        if (write(pipe_fd, message, strlen(message)) == -1) {
+                            perror("write to pipe");
+                            close(client_socket);
+                            pthread_exit(NULL);
                         }
+
+
+                        char valid[2053] ; // = 'T';
+                        char tid_verif[2053] ; 
+                        do {
+
+                            // Lire la réponse du pipe
+                            if (read(pipe_fd, valid, sizeof(valid)) == -1) {
+                                perror("read from pipe");
+                                close(client_socket);
+                                close(pipe_fd);
+                                pthread_exit(NULL);
+                            }
+
+                            // Extraire l'identifiant du thread de la réponse
+                            strcpy(tid_verif, strtok(valid, "#"));
+                            char* response = strtok(NULL, "");
+
+
+                            // Vérifier si l'identifiant du thread reçu correspond à l'identifiant du thread actuel
+                            if (strcmp(tid_verif, tid_char) == 0) {
+                                // Les identifiants de thread correspondent, traiter la réponse
+
+                                // Envoyer la réponse au client (deuxième partie de valid)
+                                if (send(client_socket, response, strlen(response), 0) == -1) {
+                                    perror("Error sending delete account response to client");
+                                    close(client_socket);
+                                    pthread_exit(NULL);
+                                }
+
+                            } else {
+                                // Les identifiants de thread ne correspondent pas, continuer à lire jusqu'à ce que ce soit le bon thread
+                                printf("Received response from wrong thread. Waiting for correct thread...\n");
+                            }
+                        } while (strcmp(tid_verif, tid_char) != 0);
+
    
 
                     } else {

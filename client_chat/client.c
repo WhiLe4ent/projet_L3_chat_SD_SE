@@ -253,15 +253,15 @@ void create_new_account(int sock) {
     }
 
     // Receive response from server
-    char response;
+    char response[2053];
     if (recv(sock, &response, sizeof(response), 0) <= 0) {
         perror("Problem receiving response from server");
         return;
     }
 
     // Check if pseudo is already in use
-    if (response == 'U') {
-        printf("Pseudo '%s' is already in use. Please choose another one.\n", pseudo);
+    if (strcmp(response, "Failed") == 0) {
+        printf("Error creating the compte. Pseudo '%s' is already in use. Please choose another one.\n", pseudo);
         
         // Loop until a valid pseudo is entered
         bool valid_pseudo = false;
@@ -293,7 +293,7 @@ void create_new_account(int sock) {
                 perror("Problem receiving response from server");
                 return;
             }
-            if (response == 'V') {
+            if (strcmp(response, "Success") == 0) {
                 printf("New account '%s' created.\n", pseudo);
                 valid_pseudo = true;
             } else {
@@ -344,7 +344,7 @@ void delete_existing_account(int sock) {
         scanf(" %[^\n]", password);
     } while (strlen(password) < 4);
 
-    // Construct message with prefix C_ACC, pseudo, and password separated by a delimiter
+    // Construct message with prefix D_ACC, pseudo, and password separated by a delimiter
     char msg[150]; // Adjust size as needed
     snprintf(msg, sizeof(msg), "D_ACC%s#%s", pseudo, password);
 
@@ -354,13 +354,15 @@ void delete_existing_account(int sock) {
     }
 
     // Receive response from server
-    char response;
+    char response[2053];
     if (recv(sock, &response, sizeof(response), 0) <= 0) {
         perror("Problem receiving response from server");
         return;
     }
 
-    if (response == 'Y') { // Account deleted
+    printf("Response : %s", response);
+    
+    if (strcmp(response, "Success")) { // Account deleted
         printf("Account deleted successfully.\n");
     } else { // Account not deleted
         printf("Account deletion failed. You can try again later.\n");
@@ -371,11 +373,6 @@ void delete_existing_account(int sock) {
     getchar(); // Wait for user to press Enter
     getchar(); // Consume the newline character from the Enter key
 }
-
-
-
-
-
 
 
 
@@ -394,6 +391,11 @@ int get_choice() {
 
     return choice;
 }
+
+
+
+
+
 
 // ------------------------------------------------------------------------------------------------------------------------------------------------------------
 

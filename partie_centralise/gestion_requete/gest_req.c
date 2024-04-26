@@ -8,7 +8,7 @@
 #include <sys/stat.h> // Pour la fonction mkfifo
 
 #define PIPE_GESTION "../file_gestion"
-#define MAX_MESSAGE_SIZE 1024
+#define MAX_MESSAGE_SIZE 2053
 #define PORT 4003
 
 void send_udp_message(const char *message, int sockfd, struct sockaddr_in *servaddr) {
@@ -28,27 +28,97 @@ void receive_udp_response(int pipe_gestion_write, int sockfd, struct sockaddr_in
 
     memset(&cliaddr, 0, sizeof(cliaddr));
 
-    while (1) {
-        len = sizeof(cliaddr);
+    len = sizeof(cliaddr);
 
-        // Réception du message
-        ssize_t n = recvfrom(sockfd, (char *)buffer, MAX_MESSAGE_SIZE, MSG_WAITALL, (struct sockaddr *)&cliaddr, &len);
-        if (n < 0) {
-            perror("Erreur lors de la réception du message");
-            exit(EXIT_FAILURE);
-        }
+    // Réception du message
+    ssize_t n = recvfrom(sockfd, (char *)buffer, MAX_MESSAGE_SIZE, MSG_WAITALL, (struct sockaddr *)&cliaddr, &len);
+    if (n < 0) {
+        perror("Erreur lors de la réception du message");
+        exit(EXIT_FAILURE);
+    }
 
-        buffer[n] = '\0';
-        printf("Réponse du serveur UDP : %s\n", buffer);
+    buffer[n] = '\0';
+    printf("Réponse du serveur UDP : %s\n", buffer);
 
-        // Envoyer la réponse du serveur UDP sur le pipe gestion
-        ssize_t bytes_written = write(pipe_gestion_write, buffer, strlen(buffer));
-        if (bytes_written == -1) {
-            perror("Erreur lors de l'écriture sur le pipe gestion");
-            exit(EXIT_FAILURE);
-        }
+    // Envoyer la réponse du serveur UDP sur le pipe gestion
+    ssize_t bytes_written = write(pipe_gestion_write, buffer, strlen(buffer));
+    if (bytes_written == -1) {
+        perror("Erreur lors de l'écriture sur le pipe gestion");
+        exit(EXIT_FAILURE);
+    }
+    printf("Done\n");
+
+}
+
+
+void handle_message(char message[MAX_MESSAGE_SIZE], int sockfd, struct sockaddr_in *servaddr, int pipe_gestion_write) {
+    // Extraire les 5 premiers caractères du message
+    char type_msg[6]; // 5 caractères + 1 pour le caractère nul
+    strncpy(type_msg, message, 5);
+    type_msg[5] = '\0'; // Assurez-vous de terminer la chaîne par un caractère nul
+
+    // Switch en fonction des 5 premiers caractères
+    switch (type_msg[0]) {
+        case 'A':
+            if (strcmp(type_msg, "A_ACC") == 0) {
+                // Envoyer au serveur UDP
+                // Envoyer le message UDP au serveur
+                send_udp_message(message, sockfd, servaddr);
+
+                // Attendre la réponse du serveur UDP et la renvoyer sur le pipe gestion
+                receive_udp_response(pipe_gestion_write, sockfd, servaddr);
+
+            } else {
+                printf("Unknown message type: %s\n", type_msg);
+            }
+            break;
+        case 'D':
+            if (strcmp(type_msg, "D_ACC") == 0) {
+                // Envoyer le message UDP au serveur
+                send_udp_message(message, sockfd, servaddr);
+
+                // Attendre la réponse du serveur UDP et la renvoyer sur le pipe gestion
+                receive_udp_response(pipe_gestion_write, sockfd, servaddr);
+
+            } else {
+                printf("Unknown message type: %s\n", type_msg);
+            }
+            break;
+        case 'C':
+            if (strcmp(type_msg, "C_ACC") == 0) {        
+                // Envoyer le message UDP au serveur
+                send_udp_message(message, sockfd, servaddr);
+
+                // Attendre la réponse du serveur UDP et la renvoyer sur le pipe gestion
+                receive_udp_response(pipe_gestion_write, sockfd, servaddr);
+
+
+            } else {
+                printf("Unknown message type: %s\n", type_msg);
+            }
+            break;
+        case 'L':
+            if (strcmp(type_msg, "L_USE") == 0) {
+                printf("List of users\n");
+
+
+            } else {
+                printf("Unknown message type: %s\n", type_msg);
+            }
+            break;
+        default:
+            printf("Unknown message type: %s\n", type_msg);
+            break;
     }
 }
+
+
+
+
+
+
+
+
 
 int main() {
     // Création du socket UDP
@@ -83,6 +153,7 @@ int main() {
 
     // Boucle de lecture des messages depuis le pipe gestion
     while (1) {
+        sleep(1); // en attendant, faudra ajouter un mutex sur le pipe d'un côté ou de l'autre.
         // Lire le message depuis le pipe gestion
         ssize_t bytes_read = read(pipe_gestion_read, message, sizeof(message));
         if (bytes_read == -1) {
@@ -96,11 +167,9 @@ int main() {
         // Ajouter un caractère nul à la fin pour former une chaîne valide
         message[bytes_read] = '\0';
 
-        // Envoyer le message UDP au serveur
-        send_udp_message(message, sockfd, &servaddr);
+        handle_message(message, sockfd, &servaddr, pipe_gestion_write);
 
-        // Attendre la réponse du serveur UDP et la renvoyer sur le pipe gestion
-        receive_udp_response(pipe_gestion_write, sockfd, &servaddr);
+
     }
 
     // Fermer les sockets et pipes gestion
