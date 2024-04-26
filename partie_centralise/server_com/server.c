@@ -140,8 +140,8 @@ void *handle_client(void *arg) {
 
 
             // For now it's always good
-            char valid[2053] ; // = 'T';
-            char tid_verif[2053] ; 
+            char valid[2053] = {0} ; // = 'T';
+            char tid_verif[2053] = {0} ; 
 
 
             do {
@@ -254,8 +254,8 @@ void *handle_client(void *arg) {
                 case 'C':
                     if (strcmp(type_msg, "C_ACC") == 0) { //------------------------  Create Account  ---------------------------------------
                         // Receive pseudo and password from client
-                        char pseudo[50]; // Adjust size as needed
-                        char password[50]; // Adjust size as needed
+                        char pseudo[50] = {0}; // Adjust size as needed
+                        char password[50] = {0}; // Adjust size as needed
 
                         // Extract pseudo and password from the message_content
                         sscanf(message_content, "%49[^#]#%49s", pseudo, password);
@@ -276,8 +276,8 @@ void *handle_client(void *arg) {
                         // For now it's always good
                         // char response[2053] ; // = 'T';
 
-                        char valid[2053] ; // = 'T';
-                        char tid_verif[2053] ; 
+                        char valid[2053] = {0} ; // = 'T';
+                        char tid_verif[2053] = {0}; 
                        do {
 
                             // Lire la réponse du pipe
@@ -322,8 +322,8 @@ void *handle_client(void *arg) {
                         // Delete Account
 
                         // Receive pseudo and password from client
-                        char pseudo[50]; // Adjust size as needed
-                        char password[50]; // Adjust size as needed
+                        char pseudo[50] = {0}; // Adjust size as needed
+                        char password[50] = {0}; // Adjust size as needed
 
                         // Extract pseudo and password from the message_content
                         sscanf(message_content, "%49[^#]#%49s", pseudo, password);
@@ -340,8 +340,8 @@ void *handle_client(void *arg) {
                         }
 
 
-                        char valid[2053] ; // = 'T';
-                        char tid_verif[2053] ; 
+                        char valid[2053] = {0} ; // = "Success";
+                        char tid_verif[2053] = {0} ; 
                         do {
 
                             // Lire la réponse du pipe

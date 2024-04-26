@@ -46,7 +46,7 @@ void* message_handler(void* arg) {
     }
 
     // Attendre la réponse du pipe gestion
-    char buffer[2048 + 50];
+    char buffer[2048 + 50] = {0};
     ssize_t bytes_read;
     printf("Waiting for response from gestion pipe...\n");
     bytes_read = read(pipe_gestion_read, buffer, sizeof(buffer));
@@ -129,8 +129,9 @@ int main() {
     printf("file_msg: Listening for messages...\n");
 
     while (1) {
+        
         // Lire le message du pipe message
-        char buffer[2048 + 50];
+        char buffer[2048 + 50] = {0};
         bytes_read = read(pipe_com_read, buffer, sizeof(buffer));
         if (bytes_read == -1) {
             perror("read");
@@ -142,8 +143,8 @@ int main() {
         }
 
         // Extraire le thread_id du message
-        char thread_id[20];
-        char message[2053];
+        char thread_id[20] = {0};
+        char message[2053] = {0};
         strcpy(thread_id, strtok(buffer, "#"));
         strcpy(message, strtok(NULL, ""));
         printf("ththth : %s\n", thread_id);
@@ -194,3 +195,6 @@ int main() {
 
     return 0;
 }
+
+
+
