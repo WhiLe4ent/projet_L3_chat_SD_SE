@@ -12,6 +12,9 @@
 #define MAX_CLIENTS 10 // Maximum number of clients
 #define MAX_ID_LENGTH 50 // Maximum length of client ID
 
+pthread_mutex_t pipe_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+
 // Déclarer le pipe nommé comme une variable globale
 char *pipe_name = "../file_com";
 
@@ -48,8 +51,16 @@ void *handle_client(void *arg) {
     char buffer[2048 + 5 + 100] = {0};
 
     // Open the named pipe for reading and writing
-    int pipe_fd = open(pipe_name, O_RDWR);
-    if (pipe_fd == -1) {
+    int pipe_fd_write = open(pipe_name, O_WRONLY);
+    if (pipe_fd_write == -1) {
+        perror("open");
+        close(client_socket);
+        pthread_exit(NULL);
+    }
+
+    // Open the named pipe for reading and writing
+    int pipe_fd_read = open(pipe_name, O_RDONLY);
+    if (pipe_fd_read == -1) {
         perror("open");
         close(client_socket);
         pthread_exit(NULL);
@@ -86,9 +97,6 @@ void *handle_client(void *arg) {
 
 
         // // Écrire le message dans le pipe avec l'ID du thread
-        // char message_with_thread_id[2053]; // Augmenter la taille si nécessaire
-        // snprintf(message_with_thread_id, sizeof(message_with_thread_id), "%lu:%s", thread_id, buffer);
-
         printf("Message from client %s: %s\n", client_id, buffer);
 
 
@@ -116,7 +124,7 @@ void *handle_client(void *arg) {
 
         size_t total_length = strlen(buffer) + strlen(tid_char) + 1; // +1 pour le caractère nul
 
-        char message[2053 + 50 ];
+        char message[2053 + 50 ] = {0};
         snprintf(message, total_length +1, "%s#%s%s", tid_char, type_msg, message_content); // +1 pour le #
 
 
@@ -130,29 +138,34 @@ void *handle_client(void *arg) {
             printf("Authentication\n");
 
 
+            pthread_mutex_lock(&pipe_mutex);
 
             // Authentication here
-            if (write(pipe_fd, message, strlen(message)) == -1) {
+            if (write(pipe_fd_write, message, strlen(message)) == -1) {
                 perror("write to pipe");
                 close(client_socket);
                 pthread_exit(NULL);
             }
 
+            pthread_mutex_unlock(&pipe_mutex);
 
-            // For now it's always good
+            sleep(1);
+            
             char valid[2053] = {0} ; // = 'T';
             char tid_verif[2053] = {0} ; 
 
 
             do {
+                pthread_mutex_lock(&pipe_mutex);
 
                 // Lire la réponse du pipe
-                if (read(pipe_fd, valid, sizeof(valid)) == -1) {
+                if (read(pipe_fd_read, valid, sizeof(valid)) == -1) {
                     perror("read from pipe");
                     close(client_socket);
-                    close(pipe_fd);
+                    close(pipe_fd_read);
                     pthread_exit(NULL);
                 }
+                pthread_mutex_unlock(&pipe_mutex);
 
                 printf("Initial response %s\n", valid);
 
@@ -263,15 +276,18 @@ void *handle_client(void *arg) {
                         printf("Pseudo : %s\nPassword : %s\n", pseudo, password);
 
                         // Check if possible
-                                    
+                        pthread_mutex_lock(&pipe_mutex);
+
             
                         // Send to file_msg here
-                        if (write(pipe_fd, message, strlen(message)) == -1) {
+                        if (write(pipe_fd_write, message, strlen(message)) == -1) {
                             perror("write to pipe");
                             close(client_socket);
                             pthread_exit(NULL);
                         }
+                        pthread_mutex_unlock(&pipe_mutex);
 
+                        sleep(1);
 
                         // For now it's always good
                         // char response[2053] ; // = 'T';
@@ -279,15 +295,16 @@ void *handle_client(void *arg) {
                         char valid[2053] = {0} ; // = 'T';
                         char tid_verif[2053] = {0}; 
                        do {
+                           pthread_mutex_lock(&pipe_mutex);
 
                             // Lire la réponse du pipe
-                            if (read(pipe_fd, valid, sizeof(valid)) == -1) {
+                            if (read(pipe_fd_read, valid, sizeof(valid)) == -1) {
                                 perror("read from pipe");
                                 close(client_socket);
-                                close(pipe_fd);
+                                close(pipe_fd_read);
                                 pthread_exit(NULL);
                             }
-
+                             pthread_mutex_unlock(&pipe_mutex);
                             // Extraire l'identifiant du thread de la réponse
                             strcpy(tid_verif, strtok(valid, "#"));
                             char* response = strtok(NULL, "");
@@ -331,26 +348,32 @@ void *handle_client(void *arg) {
                         printf("Pseudo : %s\nPassword : %s\n", pseudo, password);
 
                         // Delete account
+                        pthread_mutex_lock(&pipe_mutex);
 
                         // Send to file_msg here
-                        if (write(pipe_fd, message, strlen(message)) == -1) {
+                        if (write(pipe_fd_write, message, strlen(message)) == -1) {
                             perror("write to pipe");
                             close(client_socket);
                             pthread_exit(NULL);
                         }
 
+                        pthread_mutex_unlock(&pipe_mutex);
+
+                        sleep(1);
 
                         char valid[2053] = {0} ; // = "Success";
                         char tid_verif[2053] = {0} ; 
                         do {
+                            pthread_mutex_lock(&pipe_mutex);
 
                             // Lire la réponse du pipe
-                            if (read(pipe_fd, valid, sizeof(valid)) == -1) {
+                            if (read(pipe_fd_read, valid, sizeof(valid)) == -1) {
                                 perror("read from pipe");
                                 close(client_socket);
-                                close(pipe_fd);
+                                close(pipe_fd_read);
                                 pthread_exit(NULL);
                             }
+                            pthread_mutex_unlock(&pipe_mutex);
 
                             // Extraire l'identifiant du thread de la réponse
                             strcpy(tid_verif, strtok(valid, "#"));
@@ -399,7 +422,7 @@ int main(int argc, char const *argv[]) {
     int addrlen = sizeof(address);
     
     // Create the named pipe
-    if (mkfifo(pipe_name, 0666) == -1) {
+    if (mkfifo(pipe_name, 0777) == -1) {
         perror("mkfifo");
         exit(EXIT_FAILURE);
     }

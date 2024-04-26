@@ -14,8 +14,6 @@
 #define PIPE_NAME_PREFIX "message_pipe_"
 #define PIPE_NAME_SIZE 100
 #define MAX_ID_LENGTH 50
-// EX8312777402
-// management@courcheneige.com
 
 // Mutex for pipe access
 pthread_mutex_t pipe_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -527,7 +525,7 @@ int main(int argc, char const *argv[]) {
                     serv_addr.sin_port = htons(PORT);
 
                     // Convert IP address from text to binary form
-                    if (inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr) <= 0) {
+                    if (inet_pton(AF_INET, "10.1.13.55", &serv_addr.sin_addr) <= 0) {
                         printf("\nInvalid address/ Address not supported\n");
                         return -1;
                     }
@@ -612,7 +610,7 @@ int main(int argc, char const *argv[]) {
                     serv_addr.sin_port = htons(PORT);
 
                     // Convert IP address from text to binary form
-                    if (inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr) <= 0) {
+                    if (inet_pton(AF_INET, "10.1.13.55", &serv_addr.sin_addr) <= 0) {
                         printf("\nInvalid address/ Address not supported\n");
                         return -1;
                     }

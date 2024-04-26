@@ -17,8 +17,13 @@ public class ClientRMI {
     public static void main(String[] args) {
         try {
             // Adresse IP et port du serveur RMI
-            String serverIP = "127.0.0.1"; // Remplacez par l'adresse IP du serveur
+            String serverIP = "10.1.13.62"; // Remplacez par l'adresse IP du serveur
             int serverPort = 1099; // Port par défaut
+            
+            // Charger le fichier de politique de sécurité
+            System.setProperty("java.security.policy", "./resources/security.policy");
+            
+            
             try {
                 if (System.getSecurityManager() == null) {
                     System.setSecurityManager(new CustomSecurityManager());
