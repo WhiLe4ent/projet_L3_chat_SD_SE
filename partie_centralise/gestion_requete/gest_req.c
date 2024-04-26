@@ -148,11 +148,11 @@ int main() {
         exit(EXIT_FAILURE);
     }
 
-    // Buffer pour stocker les messages
-    char message[MAX_MESSAGE_SIZE];
 
     // Boucle de lecture des messages depuis le pipe gestion
     while (1) {
+        // Buffer pour stocker les messages
+        char message[MAX_MESSAGE_SIZE] = {0};
         sleep(1); // en attendant, faudra ajouter un mutex sur le pipe d'un côté ou de l'autre.
         // Lire le message depuis le pipe gestion
         ssize_t bytes_read = read(pipe_gestion_read, message, sizeof(message));
