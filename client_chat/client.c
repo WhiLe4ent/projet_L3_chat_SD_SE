@@ -9,6 +9,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <errno.h>
+#include <signal.h>
 
 #define PORT 8080
 #define PIPE_NAME_PREFIX "message_pipe_"
@@ -17,7 +18,9 @@
 #define IP_AD "127.0.0.1"
 
 // Mutex for pipe access
-pthread_mutex_t pipe_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+
+char pipe_name[PIPE_NAME_SIZE];
 
 // Struct to hold socket, client ID, and connection status
 struct ThreadArgs {
@@ -27,6 +30,19 @@ struct ThreadArgs {
     int *is_connected;
     char* pipe_name;
 };
+
+
+void cleanup() {
+    // Code de nettoyage à exécuter avant la sortie
+
+    // Supprimer le pipe
+    if (unlink(pipe_name) == -1) {
+        perror("unlink");
+    }else{
+        printf("Pipe unlinked successfully.\n");
+    }
+    exit(EXIT_FAILURE);
+}
 
 
 void *send_message(void *arg) {
@@ -65,9 +81,9 @@ void *send_message(void *arg) {
         // Send message to the pipe
         
         // Lock the mutex before writing to the pipe
-        pthread_mutex_lock(&pipe_mutex);
+        pthread_mutex_lock(&mutex);
         write(pipe_fd, pipe_message, strlen(pipe_message));
-        pthread_mutex_unlock(&pipe_mutex);
+        pthread_mutex_unlock(&mutex);
 
 
     }
@@ -95,9 +111,9 @@ void *receive_and_send_to_pipe(void *arg) {
         }
 
         // Lock the mutex before writing to the pipe
-        pthread_mutex_lock(&pipe_mutex);
+        pthread_mutex_lock(&mutex);
         write(pipe_fd, buffer, strlen(buffer));
-        pthread_mutex_unlock(&pipe_mutex);
+        pthread_mutex_unlock(&mutex);
     }
 
     // Close the pipe
@@ -111,6 +127,7 @@ void *receive_and_send_to_pipe(void *arg) {
 void clear_console() {
     printf("\033[2J\033[H"); // Clear the console (Linux)
 }
+
 
 void display_menu(int is_connected) {
     clear_console();
@@ -129,8 +146,6 @@ void display_menu(int is_connected) {
     }
     printf("Enter your choice: ");
 }
-
-
 
 
 char * handle_pseudo_mdp(int sock) {
@@ -156,10 +171,12 @@ char * handle_pseudo_mdp(int sock) {
     // Send pseudo with prefix A_ACC to the server
     char pseudo_serv[MAX_ID_LENGTH *2 + 6];
     sprintf(pseudo_serv, "A_ACC%s#%s", pseudo, password);
+
     if (send(sock, pseudo_serv, strlen(pseudo_serv), 0) == -1) {
         perror("Error sending pseudo to server");
         return NULL;
     }
+    printf("sent to server !  \n");
 
 
     // Wait for authentication response from the server
@@ -183,8 +200,6 @@ char * handle_pseudo_mdp(int sock) {
 }
 
 
-
-
 void show_user_list(int sock) {
     printf("Showing list of all users...\n");
 
@@ -196,6 +211,9 @@ void show_user_list(int sock) {
         return;
     }
 
+
+    pthread_mutex_lock(&mutex);
+
     // Receive the list from the server
     char list[2048]; // Adjust buffer size as needed
     memset(list, 0, sizeof(list)); // Initialize buffer
@@ -203,6 +221,7 @@ void show_user_list(int sock) {
         perror("Problem with the user list, can't receive it from the server");
         return;
     }
+    pthread_mutex_unlock(&mutex);
 
     // Print the list of connected users
     printf("List of connected users:\n");
@@ -216,9 +235,6 @@ void show_user_list(int sock) {
     printf("Press Enter to continue...");
     getchar(); // Wait for user to press Enter
 }
-
-
-
 
 
 void create_new_account(int sock) {
@@ -311,8 +327,6 @@ void create_new_account(int sock) {
 }
 
 
-
-
 void delete_existing_account(int sock) {
     printf("Deleting an existing account...\n");
 
@@ -391,7 +405,6 @@ void log_out(int sock , char *pseudo){
 }
 
 
-
 int get_choice() {
     int choice;
     char input[100];
@@ -424,10 +437,17 @@ int main(int argc, char const *argv[]) {
 
     int is_connected = 0;
     int choice;
+
+
     // Create a struct to hold socket, client ID, and pipe file descriptor
     struct ThreadArgs args;
 
- 
+
+    // if (signal(SIGINT, cleanup) == SIG_ERR) {
+    //     perror("signal");
+    //     exit(EXIT_FAILURE);
+    // }
+
 
     while (1) {
         display_menu(is_connected);
@@ -438,7 +458,7 @@ int main(int argc, char const *argv[]) {
 
                 // Write a message : ---------------------------------------------------------------------
                 case 1:{
- 
+
                     // Create a struct to hold socket, client ID, and pipe file descriptor
                     args.sock = sock;
                     // Open the pipe for writing
@@ -497,13 +517,13 @@ int main(int argc, char const *argv[]) {
                     delete_existing_account(sock);
 
                     close(sock);
+                    is_connected = 0;
                     
                     // Unlink the pipe file
                     if (unlink(args.pipe_name) == -1) {
                         perror("Error unlinking pipe");
                         return -1;
                     }
-                    is_connected = 0;
 
                     break;
                 // ---------------------------------------------------------------------------------------
@@ -513,9 +533,11 @@ int main(int argc, char const *argv[]) {
                     // Quit the client
                     printf("Quitting the client...\n");
 
-                    
-                    // Close the socket
+                    log_out(sock, args.client_id) ;
+
+                    // Close the sockets
                     close(sock);
+                    close(args.pipe_fd);
 
                     // Unlink the pipe file
                     if (unlink(args.pipe_name) == -1) {
@@ -567,7 +589,6 @@ int main(int argc, char const *argv[]) {
                         break;
                     }
                     // Construct the pipe name with client ID
-                    char pipe_name[PIPE_NAME_SIZE];
                     sprintf(pipe_name, "%s%s", PIPE_NAME_PREFIX, client_id);
 
                     args.pipe_name = pipe_name ;

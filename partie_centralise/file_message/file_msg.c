@@ -6,14 +6,17 @@
 #include <pthread.h>
 #include <sys/stat.h>
 #include <semaphore.h>
+#include <signal.h>
 
-#define PIPE_COM "../file_com"
-#define PIPE_GESTION "../file_gestion"
+#define PIPE_TO_GESTION "../pipe_to_gestion"
+#define PIPE_GEST_TO_FILE_MSG "../pipe_gest_to_file_msg"
+#define PIPE_COM_TO_FILE_MSG "../pipe_com_to_file_msg"
+#define PIPE_TO_COM "../pipe_to_com"
 
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
 int message_pending = 0;
-int pipe_gestion_read, pipe_gestion_write, pipe_com_write, pipe_com_read;
+int pipe_to_gestion_write, pipe_gest_to_file_msg_read, pipe_com_to_file_msg_read, pipe_to_com_write;
 
 // Structure pour stocker les informations du thread
 typedef struct {
@@ -31,6 +34,33 @@ typedef struct {
     char tid_s[20];
 } MessageInfo;
 
+void cleanup() {
+    // Code de nettoyage à exécuter avant la sortie
+
+    // Supprimer les pipes
+
+    if (unlink(PIPE_TO_GESTION) == -1) {
+        perror("unlink");
+        exit(EXIT_FAILURE);
+    }
+    if (unlink(PIPE_GEST_TO_FILE_MSG) == -1) {
+        perror("unlink");
+        exit(EXIT_FAILURE);
+    }
+    if (unlink(PIPE_COM_TO_FILE_MSG) == -1) {
+        perror("unlink");
+        exit(EXIT_FAILURE);
+    }
+    if (unlink(PIPE_TO_COM) == -1) {
+        perror("unlink");
+        exit(EXIT_FAILURE);
+    }
+
+    printf("Pipes unlinked successfully.\n");
+    exit(EXIT_FAILURE);
+
+}
+
 // Fonction exécutée par chaque thread pour traiter les messages
 void* message_handler(void* arg) {
     MessageInfo* msg_info = (MessageInfo*)arg;
@@ -40,17 +70,16 @@ void* message_handler(void* arg) {
 
     // Envoyer le message au pipe gestion
     printf("Sending message to gestion pipe: %s\n", msg_info->message);
-    if (write(pipe_gestion_write, msg_info->message, strlen(msg_info->message)) == -1) {
+    if (write(pipe_to_gestion_write, msg_info->message, strlen(msg_info->message)) == -1) {
         perror("write to gestion pipe");
         exit(EXIT_FAILURE);
     }
-    sleep(1);
 
     // Attendre la réponse du pipe gestion
     char buffer[2048 + 50] = {0};
     ssize_t bytes_read;
     printf("Waiting for response from gestion pipe...\n");
-    bytes_read = read(pipe_gestion_read, buffer, sizeof(buffer));
+    bytes_read = read(pipe_gest_to_file_msg_read, buffer, sizeof(buffer));
     if (bytes_read == -1) {
         perror("read from gestion pipe");
         exit(EXIT_FAILURE);
@@ -65,13 +94,13 @@ void* message_handler(void* arg) {
     // Envoyer la réponse au pipe message
     printf("Thread_id : %s\n", msg_info->tid_s);
 
-    char response[2053] ;
+    char response[2053];
     snprintf(response, sizeof(msg_info->tid_s) + sizeof(buffer) + 2 , "%s#%s", msg_info->tid_s, buffer);
 
     printf("Response : %s\n", response);
 
     printf("Sending response to com pipe...\n");
-    if (write(pipe_com_write, response, strlen(response)) == -1) {
+    if (write(pipe_to_com_write, response, strlen(response)) == -1) {
         perror("write to com pipe");
         exit(EXIT_FAILURE);
     }
@@ -79,42 +108,51 @@ void* message_handler(void* arg) {
     return NULL;
 }
 
-
-
 int main() {
-    // Créer le pipe file_gestion avec mkfifo
-    if (mkfifo(PIPE_GESTION, 0666) == -1) {
+    // Créer les pipes ---------------------------------------------------------
+
+    if (mkfifo(PIPE_TO_GESTION, 0666) == -1) {
+        perror("mkfifo");
+        exit(EXIT_FAILURE);
+    }
+    if (mkfifo(PIPE_GEST_TO_FILE_MSG, 0666) == -1) {
         perror("mkfifo");
         exit(EXIT_FAILURE);
     }
 
+
     ssize_t bytes_read;
 
-    // Ouvrir le pipe gestion en écriture
-    pipe_gestion_write = open(PIPE_GESTION, O_WRONLY);
-    if (pipe_gestion_write == -1) {
+    // Ouvrir les pipes en écriture ---------------------------------------------------------
+
+    pipe_to_gestion_write = open(PIPE_TO_GESTION, O_WRONLY);
+    if (pipe_to_gestion_write == -1) {
+        perror("open");
+        exit(EXIT_FAILURE);
+    }
+    pipe_to_com_write = open(PIPE_TO_COM, O_WRONLY);
+    if (pipe_to_com_write == -1) {
         perror("open");
         exit(EXIT_FAILURE);
     }
 
-    // Ouvrir le pipe gestion en lecture
-    pipe_gestion_read = open(PIPE_GESTION, O_RDONLY);
-    if (pipe_gestion_read == -1) {
+    // Ouvrir les pipes en lecture ---------------------------------------------------------
+
+    pipe_gest_to_file_msg_read = open(PIPE_GEST_TO_FILE_MSG, O_RDONLY);
+    if (pipe_gest_to_file_msg_read == -1) {
+        perror("open");
+        exit(EXIT_FAILURE);
+    }
+    pipe_com_to_file_msg_read = open(PIPE_COM_TO_FILE_MSG, O_RDONLY);
+    if (pipe_com_to_file_msg_read == -1) {
         perror("open");
         exit(EXIT_FAILURE);
     }
 
-    // Ouvrir le pipe message en lecture
-    pipe_com_read = open(PIPE_COM, O_RDONLY);
-    if (pipe_com_read == -1) {
-        perror("open");
-        exit(EXIT_FAILURE);
-    }
 
-    // Ouvrir le pipe message en écriture
-    pipe_com_write = open(PIPE_COM, O_WRONLY);
-    if (pipe_com_write == -1) {
-        perror("open");
+    // Définir le gestionnaire de signal pour SIGINT (Ctrl+C) ---------------------------------------------------------
+    if (signal(SIGINT, cleanup) == SIG_ERR) {
+        perror("signal");
         exit(EXIT_FAILURE);
     }
 
@@ -133,7 +171,7 @@ int main() {
         
         // Lire le message du pipe message
         char buffer[2048 + 50] = {0};
-        bytes_read = read(pipe_com_read, buffer, sizeof(buffer));
+        bytes_read = read(pipe_com_to_file_msg_read, buffer, sizeof(buffer));
         if (bytes_read == -1) {
             perror("read");
             exit(EXIT_FAILURE);
@@ -187,24 +225,30 @@ int main() {
     }
 
     // Fermer les pipes
-    close(pipe_com_read);
-    close(pipe_com_write);
-    close(pipe_gestion_read);
-    close(pipe_gestion_write);
-    
-    if (unlink(PIPE_COM) == -1) {
-        perror("Error unlinking pipe");
-        return -1;
-    }
-    
-    if (unlink(PIPE_GESTION) == -1) {
-        perror("Error unlinking pipe");
-        return -1;
-    }
 
+    close(pipe_to_gestion_write);
+    close(pipe_gest_to_file_msg_read);
+    close(pipe_com_to_file_msg_read);
+    close(pipe_to_com_write);
+
+    // Supprimer les pipes
+
+    if (unlink(PIPE_TO_GESTION) == -1) {
+        perror("unlink");
+        exit(EXIT_FAILURE);
+    }
+    if (unlink(PIPE_GEST_TO_FILE_MSG) == -1) {
+        perror("unlink");
+        exit(EXIT_FAILURE);
+    }
+    if (unlink(PIPE_COM_TO_FILE_MSG) == -1) {
+        perror("unlink");
+        exit(EXIT_FAILURE);
+    }
+    if (unlink(PIPE_TO_COM) == -1) {
+        perror("unlink");
+        exit(EXIT_FAILURE);
+    }
 
     return 0;
 }
-
-
-

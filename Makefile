@@ -25,10 +25,10 @@ gest_req: ./partie_centralise/gestion_requete/gest_req.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 clean:
-	rm -f *.o ./client_chat/client ./partie_centralise/server_com/server ./client_chat/message_pipe_* ./client_chat/afficheur_msg  ./partie_centralise/file_gestion ./partie_centralise/file_com 
+	rm -f *.o ./client_chat/client ./partie_centralise/server_com/server ./client_chat/message_pipe_* ./client_chat/afficheur_msg ./partie_centralise/pipe_to_gestion ./partie_centralise/pipe_gest_to_files_msg ./partie_centralise/pipe_com_to_files_msg ./partie_centralise/pipe_to_com 
 
 clean_pipe:
-	rm -rf ./partie_centralise/file_gestion ./partie_centralise/file_com ./client_chat/message_pipe_*
+	rm -rf ./partie_centralise/pipe_to_gestion ./partie_centralise/pipe_gest_to_file_msg ./partie_centralise/pipe_com_to_file_msg ./partie_centralise/pipe_to_com ./client_chat/message_pipe_*
 
 run: all
 	@echo "Launching server..."

@@ -11,7 +11,10 @@
 #include <sys/ipc.h>
 #include <sys/shm.h>
 
+#define PIPE_COM_TO_FILE_MSG "../pipe_com_to_file_msg"
+#define PIPE_TO_COM "../pipe_to_com"
 
+int pipe_read, pipe_write;
 
 #define PORT 8080
 #define MAX_CLIENTS 10 // Maximum number of clients
@@ -20,16 +23,18 @@
 #define MAX_USERS 10
 #define MAX_PSEUDO_LENGTH 50
 
+
+#define ROWS 10
+#define COLS 50
+
+
+
 typedef struct {
     char pseudo[MAX_PSEUDO_LENGTH];
 } User;
 
 
 pthread_mutex_t pipe_mutex = PTHREAD_MUTEX_INITIALIZER;
-
-
-// Déclarer le pipe nommé comme une variable globale
-char *pipe_name = "../file_com";
 
 
 
@@ -56,6 +61,53 @@ Client clients[MAX_CLIENTS];
 int num_clients = 0; // Number of connected clients
 
 
+void cleanup() {
+    // Code de nettoyage à exécuter avant la sortie
+
+    // Supprimer les pipes
+
+    if (unlink(PIPE_COM_TO_FILE_MSG) == -1) {
+        perror("unlink");
+        exit(EXIT_FAILURE);
+    }
+    if (unlink(PIPE_TO_COM) == -1) {
+        perror("unlink");
+        exit(EXIT_FAILURE);
+    }
+
+    printf("Pipes unlinked successfully.\n");
+    exit(EXIT_FAILURE);
+}
+
+
+void create_shared_memory(char **shared_memory) {
+    // Générer une clé unique avec ftok
+    key_t key = ftok("../memoire_partagee/mem_part.txt", 65);
+
+    // Créer ou localiser un segment de mémoire partagée
+    int shmid = shmget(key, sizeof(char) * ROWS * COLS, IPC_CREAT | 0666);
+    if (shmid == -1) {
+        perror("shmget");
+        exit(EXIT_FAILURE);
+    }
+
+    // Attacher le segment de mémoire partagée
+    *shared_memory = (char *)shmat(shmid, NULL, 0);
+    if (*shared_memory == (char *)-1) {
+        perror("shmat");
+        exit(EXIT_FAILURE);
+    }
+}
+
+
+void detach_shared_memory(char *shared_memory) {
+    // Détacher le segment de mémoire partagée
+    if (shmdt(shared_memory) == -1) {
+        perror("shmdt");
+        exit(EXIT_FAILURE);
+    }
+}
+
 
 void get_connected_users(char *shared_memory, User *users) {
     // Parcourir la mémoire partagée et copier chaque pseudo dans la liste
@@ -70,28 +122,23 @@ void get_connected_users(char *shared_memory, User *users) {
 }
 
 
-void write_pipe_com( char *message, int pipe_fd_write){
+void write_pipe_com( char *message){
 
-    pthread_mutex_lock(&pipe_mutex);
 
     // Authentication here
-    if (write(pipe_fd_write, message, strlen(message)) == -1) {
+    if (write(pipe_write, message, strlen(message)) == -1) {
         perror("write to pipe");
         pthread_exit(NULL);
     }
 
-    pthread_mutex_unlock(&pipe_mutex);
-
-    sleep(1);
 
 }
 
 
-void read_pipe_com(char *response, int pipe_fd_read) {
-    // pthread_mutex_lock(&pipe_mutex);
+void read_pipe_com(char *response) {
 
     // Read from the named pipe
-    ssize_t bytes_read = read(pipe_fd_read, response, 2053 - 1);
+    ssize_t bytes_read = read(pipe_read, response, 2053 - 1);
     if (bytes_read == -1) {
         perror("read from pipe");
         pthread_exit(NULL);
@@ -99,9 +146,6 @@ void read_pipe_com(char *response, int pipe_fd_read) {
 
     // Null-terminate the response buffer
     response[bytes_read] = '\0';
-
-    // pthread_mutex_unlock(&pipe_mutex);
-    // sleep(1);
 }
 
 
@@ -116,17 +160,17 @@ void send_tcp( int client_socket, char *message){
 }
 
 
-void read_and_send_response(int pipe_fd_read, int client_socket, const char *tid_char, char *type_msg) {
-    char valid[2053] = {0}; // Buffer for storing the response
+void read_and_send_response( int client_socket, const char *tid_char, char *type_msg) {
+    char response[2053] = {0}; // Buffer for storing the response
     char tid_verif[2053] = {0}; // Buffer for storing the thread identifier received from the response
 
     do {
         // Read the response from the pipe
-        read_pipe_com(valid, pipe_fd_read);
-        printf("Initial response from pipe com : %s\n", valid);
+        read_pipe_com(response);
+        printf("Initial response from pipe com : %s\n", response);
 
         // Extract the thread identifier and response from the received message
-        strcpy(tid_verif, strtok(valid, "#"));
+        strcpy(tid_verif, strtok(response, "#"));
         char *response = strtok(NULL, "");
         printf("Thread id response %s\n", tid_verif);
 
@@ -154,16 +198,16 @@ void *handle_client(void *arg) {
     char buffer[2048 + 5 + 100] = {0};
 
     // Open the named pipe for reading and writing
-    int pipe_fd_write = open(pipe_name, O_WRONLY);
-    if (pipe_fd_write == -1) {
+    pipe_write = open(PIPE_COM_TO_FILE_MSG, O_WRONLY);
+    if (pipe_write == -1) {
         perror("open");
         close(client_socket);
         pthread_exit(NULL);
     }
 
     // Open the named pipe for reading and writing
-    int pipe_fd_read = open(pipe_name, O_RDONLY);
-    if (pipe_fd_read == -1) {
+    pipe_read = open(PIPE_TO_COM, O_RDONLY);
+    if (pipe_read == -1) {
         perror("open");
         close(client_socket);
         pthread_exit(NULL);
@@ -241,10 +285,10 @@ void *handle_client(void *arg) {
             printf("Authentication\n");
 
 
-            write_pipe_com(message, pipe_fd_write);
+            write_pipe_com(message);
 
            
-            read_and_send_response(pipe_fd_read, client_socket, tid_char, type_msg);
+            read_and_send_response( client_socket, tid_char, type_msg);
 
 
             // Extraire le client_id de la première partie de message_content
@@ -273,10 +317,6 @@ void *handle_client(void *arg) {
                     if (strcmp(type_msg, "S_MSG") == 0) {
                         // Send the message to all clients except the one who sent it
 
-                        char message_content[valread - 5]; // Subtract 5 for the first 5 characters
-                        strncpy(message_content, buffer + 5, valread - 5);
-                        message_content[valread - 5] = '\0'; // Null-terminate the string
-
                         for (int i = 0; i < num_clients; i++) {
                             if (clients[i].socket != client_socket) {
                                 // Construct the message with client ID prefix
@@ -295,32 +335,12 @@ void *handle_client(void *arg) {
                     if (strcmp(type_msg, "L_USE") == 0) { //-----------------------  List of User  -----------------------------------------
                         // Get list of connected users
 
-                        // Créer une clé pour la mémoire partagée
-                        key_t key = ftok("../memoire_partagee/mem_part.txt", 65);
-                        if (key == -1) {
-                            perror("Erreur lors de la génération de la clé");
-                            exit(EXIT_FAILURE);
-                        }
-
-                        // Obtenir l'identifiant de la mémoire partagée
-                        int shm_id = shmget(key, sizeof(char) * MAX_USERS * MAX_PSEUDO_LENGTH, 0666);
-                        if (shm_id == -1) {
-                            perror("Erreur lors de l'obtention de l'identifiant de la mémoire partagée");
-                            exit(EXIT_FAILURE);
-                        }
-
-                        // Attacher la mémoire partagée
-                        char *shared_memory = shmat(shm_id, NULL, 0);
-                        if (shared_memory == (void *)-1) {
-                            perror("Erreur lors de l'attachement de la mémoire partagée");
-                            exit(EXIT_FAILURE);
-                        }
-
-
-                        // Déclarer un tableau pour stocker les utilisateurs connectés
-                        User users[MAX_USERS];
+                        // Créer l'espace de mémoire partagée
+                        char *shared_memory;
+                        create_shared_memory(&shared_memory);
 
                         // Récupérer la liste des utilisateurs connectés depuis la mémoire partagée
+                        User users[MAX_USERS];
                         get_connected_users(shared_memory, users);
 
                         // Afficher la liste des utilisateurs connectés
@@ -344,6 +364,10 @@ void *handle_client(void *arg) {
 
                         // Send the list to the client
                         send_tcp(client_socket, list);
+                        
+
+                        // Détacher l'espace de mémoire partagée
+                        detach_shared_memory(shared_memory);
 
                     }
                     else if (strcmp(type_msg, "L_ACC") == 0)
@@ -356,8 +380,8 @@ void *handle_client(void *arg) {
                         sscanf(message_content, "%49[^#]#%49s", pseudo, password);
                         printf("Pseudo : %s\nPassword : %s\n", pseudo, password);
 
-                        write_pipe_com(message, pipe_fd_write);
-                        read_and_send_response(pipe_fd_read, client_socket, tid_char, type_msg);
+                        write_pipe_com(message);
+                        read_and_send_response( client_socket, tid_char, type_msg);
 
                     }
                     else {
@@ -376,8 +400,8 @@ void *handle_client(void *arg) {
                         sscanf(message_content, "%49[^#]#%49s", pseudo, password);
                         printf("Pseudo : %s\nPassword : %s\n", pseudo, password);
 
-                        write_pipe_com(message, pipe_fd_write);
-                        read_and_send_response(pipe_fd_read, client_socket, tid_char, type_msg);
+                        write_pipe_com(message );
+                        read_and_send_response( client_socket, tid_char, type_msg);
 
                     } else {
                         printf("Unknown message type: %s\n", type_msg);
@@ -398,9 +422,9 @@ void *handle_client(void *arg) {
 
                         printf("Pseudo : %s\nPassword : %s\n", pseudo, password);
 
-                        write_pipe_com(message, pipe_fd_write);
+                        write_pipe_com(message);
 
-                        read_and_send_response(pipe_fd_read, client_socket, tid_char, type_msg) ;
+                        read_and_send_response( client_socket, tid_char, type_msg) ;
 
 
                     } else {
@@ -427,19 +451,23 @@ int main(int argc, char const *argv[]) {
     int opt = 1;
     int addrlen = sizeof(address);
     
-    // Create the named pipe
-    if (mkfifo(pipe_name, 0777) == -1) {
+    // Create the named pipe ---------------------------------------------------------
+    if (mkfifo(PIPE_COM_TO_FILE_MSG, 0666) == -1) {
+        perror("mkfifo");
+        exit(EXIT_FAILURE);
+    }
+    if (mkfifo(PIPE_TO_COM, 0666) == -1) {
         perror("mkfifo");
         exit(EXIT_FAILURE);
     }
 
-    // Create server socket
+    // Create server socket ---------------------------------------------------------
     if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
         perror("socket failed");
         exit(EXIT_FAILURE);
     }
 
-    // Set socket options
+    // Set socket options ---------------------------------------------------------
     if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt))) {
         perror("setsockopt");
         exit(EXIT_FAILURE);
@@ -448,14 +476,14 @@ int main(int argc, char const *argv[]) {
     address.sin_addr.s_addr = INADDR_ANY;
     address.sin_port = htons(PORT);
 
-    // Bind the socket
+    // Bind the socket ---------------------------------------------------------
     if (bind(server_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
         perror("bind failed");
         exit(EXIT_FAILURE);
     }
 
-    // Listen for incoming connections
-    if (listen(server_fd, 3) < 0) {
+    // Listen for incoming connections ---------------------------------------------------------
+    if (listen(server_fd, 10) < 0) {
         perror("listen");
         exit(EXIT_FAILURE);
     }
@@ -468,6 +496,7 @@ int main(int argc, char const *argv[]) {
             perror("accept");
             exit(EXIT_FAILURE);
         }
+        printf("Welcome in the server");
 
         // Create a new thread to handle the client
         pthread_t client_thread;

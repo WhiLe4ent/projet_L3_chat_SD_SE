@@ -9,8 +9,10 @@
 #include <sys/types.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
+#include <signal.h>
 
-#define PIPE_GESTION "../file_gestion"
+#define PIPE_TO_GESTION "../pipe_to_gestion"
+#define PIPE_TO_FILE_MSG "../pipe_gest_to_file_msg"
 #define MAX_MESSAGE_SIZE 2053
 #define PORT 4003
 
@@ -19,7 +21,10 @@
 
 int next_index = 0; // Global variable to track the next available index in shared memory
 
-void create_shared_memory(char **shared_memory) {
+char *shared_memory = {0};
+
+
+void create_shared_memory() {
     // Générer une clé unique avec ftok
     key_t key = ftok("../memoire_partagee/mem_part.txt", 65);
 
@@ -31,15 +36,14 @@ void create_shared_memory(char **shared_memory) {
     }
 
     // Attacher le segment de mémoire partagée
-    *shared_memory = (char *)shmat(shmid, NULL, 0);
-    if (*shared_memory == (char *)-1) {
+    shared_memory = (char *)shmat(shmid, NULL, 0);
+    if (shared_memory == (char *)-1) {
         perror("shmat");
         exit(EXIT_FAILURE);
     }
 }
 
-
-void detach_shared_memory(char *shared_memory) {
+void detach_shared_memory() {
     // Détacher le segment de mémoire partagée
     if (shmdt(shared_memory) == -1) {
         perror("shmdt");
@@ -47,7 +51,7 @@ void detach_shared_memory(char *shared_memory) {
     }
 }
 
-void add_to_shared_memory(char *shared_memory, const char *pseudo) {
+void add_to_shared_memory(const char *pseudo) {
     // Vérifier si l'index dépasse la taille maximale
     if (next_index >= ROWS) {
         printf("Cannot add more pseudonyms. Shared memory is full.\n");
@@ -62,7 +66,7 @@ void add_to_shared_memory(char *shared_memory, const char *pseudo) {
     next_index++;
 }
 
-void remove_from_shared_memory(char *shared_memory, const char *pseudo) {
+void remove_from_shared_memory(const char *pseudo) {
     // Parcourir la mémoire partagée pour trouver le pseudonyme et le remplacer par une chaîne vide
     for (int i = 0; i < ROWS; i++) {
         char *current_pseudo = shared_memory + i * COLS;
@@ -76,8 +80,6 @@ void remove_from_shared_memory(char *shared_memory, const char *pseudo) {
     // Pseudonyme non trouvé
     printf("Pseudo '%s' not found in shared memory.\n", pseudo);
 }
-
-
 
 void send_udp_message(const char *message, int sockfd, struct sockaddr_in *servaddr) {
     // Envoi du message
@@ -111,23 +113,32 @@ char *receive_udp_response(int sockfd, struct sockaddr_in *servaddr) {
     return buffer;  // Retourner directement le pointeur vers la variable statique
 }
 
-void send_response_pipe(int pipe_gestion_write, char *response) {
+void send_response_pipe(int pipe_TO_gestion_write, char *response) {
     // Envoyer la réponse du serveur UDP sur le pipe gestion
-    ssize_t bytes_written = write(pipe_gestion_write, response, strlen(response));
+    ssize_t bytes_written = write(pipe_TO_gestion_write, response, strlen(response));
     if (bytes_written == -1) {
         perror("Erreur lors de l'écriture sur le pipe gestion");
         exit(EXIT_FAILURE);
     }
     printf("Done\n");
-    sleep(1);
 }
 
+void cleanup() {
+    // Code de nettoyage à exécuter avant la sortie
 
+    detach_shared_memory();
 
+    // Supprimer le pipe
+    if (unlink(PIPE_TO_GESTION) == -1) {
+        perror("unlink");
+        exit(EXIT_FAILURE);
+    }
 
+    printf("Pipe unlinked successfully.\n");
+    exit(EXIT_FAILURE);
+}
 
-
-void handle_message(char message[MAX_MESSAGE_SIZE], int sockfd, struct sockaddr_in *servaddr, int pipe_gestion_write, char *shared_memory) {
+void handle_message(char message[MAX_MESSAGE_SIZE], int sockfd, struct sockaddr_in *servaddr, int pipe_TO_gestion_write, char *shared_memory) {
     // Extraire les 5 premiers caractères du message
     char type_msg[6]; // 5 caractères + 1 pour le caractère nul
     strncpy(type_msg, message, 5);
@@ -156,10 +167,10 @@ void handle_message(char message[MAX_MESSAGE_SIZE], int sockfd, struct sockaddr_
 
                 if (strcmp(response, "Success") == 0) {
                     // Ajouter le pseudo à la mémoire partagée
-                    add_to_shared_memory(shared_memory, pseudo);
+                    add_to_shared_memory(pseudo);
                 }
 
-                send_response_pipe(pipe_gestion_write, response);
+                send_response_pipe(pipe_TO_gestion_write, response);
             } else {
                 printf("Unknown message type: %s\n", type_msg);
             }
@@ -171,7 +182,7 @@ void handle_message(char message[MAX_MESSAGE_SIZE], int sockfd, struct sockaddr_
 
                 // Attendre la réponse du serveur UDP et la renvoyer sur le pipe gestion
                 char *response = receive_udp_response(sockfd, servaddr);
-                send_response_pipe(pipe_gestion_write, response);
+                send_response_pipe(pipe_TO_gestion_write, response);
             } else {
                 printf("Unknown message type: %s\n", type_msg);
             }
@@ -183,7 +194,7 @@ void handle_message(char message[MAX_MESSAGE_SIZE], int sockfd, struct sockaddr_
 
                 // Attendre la réponse du serveur UDP et la renvoyer sur le pipe gestion
                 char *response = receive_udp_response(sockfd, servaddr);
-                send_response_pipe(pipe_gestion_write, response);
+                send_response_pipe(pipe_TO_gestion_write, response);
             } else {
                 printf("Unknown message type: %s\n", type_msg);
             }
@@ -192,11 +203,11 @@ void handle_message(char message[MAX_MESSAGE_SIZE], int sockfd, struct sockaddr_
             if (strcmp(type_msg, "L_ACC") == 0) {
                 // Logout
                 // Remove pseudo from shared memory
-                remove_from_shared_memory(shared_memory, pseudo);
+                remove_from_shared_memory(pseudo);
 
-                char response[8] = "Success" ;
-                response[8] = '\0' ;
-                send_response_pipe(pipe_gestion_write, response);
+                char response[8] = "Success";
+                response[8] = '\0';
+                send_response_pipe(pipe_TO_gestion_write, response);
             } else {
                 printf("Unknown message type: %s\n", type_msg);
             }
@@ -222,30 +233,35 @@ int main() {
     servaddr.sin_addr.s_addr = inet_addr("127.0.0.1"); // Adresse IP du client RMI
 
     // Ouvrir le pipe gestion en lecture
-    int pipe_gestion_read = open(PIPE_GESTION, O_RDONLY);
-    if (pipe_gestion_read == -1) {
+    int pipe_TO_gestion_read = open(PIPE_TO_GESTION, O_RDONLY);
+    if (pipe_TO_gestion_read == -1) {
         perror("open");
         exit(EXIT_FAILURE);
     }
 
-    // Ouvrir le pipe gestion en écriture
-    int pipe_gestion_write = open(PIPE_GESTION, O_WRONLY);
-    if (pipe_gestion_write == -1) {
+
+    // Ouvrir le nouveau pipe en écriture
+    int pipe_to_file_msg_write = open(PIPE_TO_FILE_MSG, O_WRONLY);
+    if (pipe_to_file_msg_write == -1) {
         perror("open");
+        exit(EXIT_FAILURE);
+    }
+
+    if (signal(SIGINT, cleanup) == SIG_ERR) {
+        perror("signal");
         exit(EXIT_FAILURE);
     }
 
     // Créer l'espace de mémoire partagée
-    char *shared_memory;
-    create_shared_memory(&shared_memory);
+    create_shared_memory();
 
     // Boucle de lecture des messages depuis le pipe gestion
     while (1) {
         // Buffer pour stocker les messages
         char message[MAX_MESSAGE_SIZE] = {0};
-        sleep(1); // en attendant, faudra ajouter un mutex sur le pipe d'un côté ou de l'autre.
+
         // Lire le message depuis le pipe gestion
-        ssize_t bytes_read = read(pipe_gestion_read, message, sizeof(message));
+        ssize_t bytes_read = read(pipe_TO_gestion_read, message, sizeof(message));
         if (bytes_read == -1) {
             perror("Erreur lors de la lecture depuis le pipe gestion");
             exit(EXIT_FAILURE);
@@ -257,18 +273,21 @@ int main() {
         // Ajouter un caractère nul à la fin pour former une chaîne valide
         message[bytes_read] = '\0';
 
-        handle_message(message, sockfd, &servaddr, pipe_gestion_write, shared_memory);
-        
+        handle_message(message, sockfd, &servaddr, pipe_to_file_msg_write, shared_memory);
     }
 
     // Détacher l'espace de mémoire partagée
-    detach_shared_memory(shared_memory);
+    detach_shared_memory();
 
     // Fermer les sockets et pipes gestion
     close(sockfd);
-    close(pipe_gestion_read);
-    close(pipe_gestion_write);
-    if (unlink(PIPE_GESTION) == -1) {
+    close(pipe_TO_gestion_read);
+    close(pipe_to_file_msg_write);  // Fermer le pipe vers file_msg
+    if (unlink(PIPE_TO_GESTION) == -1) {
+        perror("Error unlinking pipe");
+        return -1;
+    }
+    if (unlink(PIPE_TO_FILE_MSG) == -1) {
         perror("Error unlinking pipe");
         return -1;
     }
