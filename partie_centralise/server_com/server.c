@@ -7,10 +7,23 @@
 #include <stdbool.h>
 #include <fcntl.h> // Pour les constantes de mode d'ouverture des pipes
 #include <sys/stat.h> // Pour la fonction mkfifo
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+
+
 
 #define PORT 8080
 #define MAX_CLIENTS 10 // Maximum number of clients
 #define MAX_ID_LENGTH 50 // Maximum length of client ID
+
+#define MAX_USERS 10
+#define MAX_PSEUDO_LENGTH 50
+
+typedef struct {
+    char pseudo[MAX_PSEUDO_LENGTH];
+} User;
+
 
 pthread_mutex_t pipe_mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -41,6 +54,96 @@ typedef struct {
 // Global array to store connected clients
 Client clients[MAX_CLIENTS];
 int num_clients = 0; // Number of connected clients
+
+
+
+void get_connected_users(char *shared_memory, User *users) {
+    // Parcourir la mémoire partagée et copier chaque pseudo dans la liste
+    int count = 0;
+    for (int i = 0; i < MAX_USERS; i++) {
+        char *current_pseudo = shared_memory + i * MAX_PSEUDO_LENGTH;
+        if (strcmp(current_pseudo, "") != 0) {
+            strcpy(users[count].pseudo, current_pseudo);
+            count++;
+        }
+    }
+}
+
+
+void write_pipe_com( char *message, int pipe_fd_write){
+
+    pthread_mutex_lock(&pipe_mutex);
+
+    // Authentication here
+    if (write(pipe_fd_write, message, strlen(message)) == -1) {
+        perror("write to pipe");
+        pthread_exit(NULL);
+    }
+
+    pthread_mutex_unlock(&pipe_mutex);
+
+    sleep(1);
+
+}
+
+
+void read_pipe_com(char *response, int pipe_fd_read) {
+    // pthread_mutex_lock(&pipe_mutex);
+
+    // Read from the named pipe
+    ssize_t bytes_read = read(pipe_fd_read, response, 2053 - 1);
+    if (bytes_read == -1) {
+        perror("read from pipe");
+        pthread_exit(NULL);
+    }
+
+    // Null-terminate the response buffer
+    response[bytes_read] = '\0';
+
+    // pthread_mutex_unlock(&pipe_mutex);
+    // sleep(1);
+}
+
+
+void send_tcp( int client_socket, char *message){
+
+    if (send(client_socket, message, strlen(message), 0) == -1) {
+        perror("Error sending authentication response to client");
+        close(client_socket);
+        pthread_exit(NULL);
+    }
+
+}
+
+
+void read_and_send_response(int pipe_fd_read, int client_socket, const char *tid_char, char *type_msg) {
+    char valid[2053] = {0}; // Buffer for storing the response
+    char tid_verif[2053] = {0}; // Buffer for storing the thread identifier received from the response
+
+    do {
+        // Read the response from the pipe
+        read_pipe_com(valid, pipe_fd_read);
+        printf("Initial response from pipe com : %s\n", valid);
+
+        // Extract the thread identifier and response from the received message
+        strcpy(tid_verif, strtok(valid, "#"));
+        char *response = strtok(NULL, "");
+        printf("Thread id response %s\n", tid_verif);
+
+        // Check if the received thread identifier matches the current thread identifier
+        if (strcmp(tid_verif, tid_char) == 0 && strcmp(type_msg, "L_ACC") != 0) {
+            printf("Response : %s\n", response);
+
+            // Send the response to the client
+            send_tcp(client_socket, response);
+        } else {
+            // The thread identifiers do not match, continue reading until the correct thread is received
+            printf("Received response from wrong thread. Waiting for correct thread...\n");
+        }
+    } while (strcmp(tid_verif, tid_char) != 0);
+}
+
+
 
 // Function to handle each client connection
 void *handle_client(void *arg) {
@@ -138,75 +241,27 @@ void *handle_client(void *arg) {
             printf("Authentication\n");
 
 
-            pthread_mutex_lock(&pipe_mutex);
+            write_pipe_com(message, pipe_fd_write);
 
-            // Authentication here
-            if (write(pipe_fd_write, message, strlen(message)) == -1) {
-                perror("write to pipe");
+           
+            read_and_send_response(pipe_fd_read, client_socket, tid_char, type_msg);
+
+
+            // Extraire le client_id de la première partie de message_content
+            strcpy(client_id , strtok(message_content, "#"));
+            printf("Client_id : %s\n", client_id);
+
+            // Stocker les informations du client
+            if (num_clients < MAX_CLIENTS) {
+                strcpy(clients[num_clients].id, client_id);
+                clients[num_clients].socket = client_socket;
+                num_clients++;
+                printf("Client %s connected\n", client_id);
+            } else {
+                printf("Max clients reached. Rejecting connection from client %s.\n", client_id);
                 close(client_socket);
                 pthread_exit(NULL);
-            }
-
-            pthread_mutex_unlock(&pipe_mutex);
-
-            sleep(1);
-            
-            char valid[2053] = {0} ; // = 'T';
-            char tid_verif[2053] = {0} ; 
-
-
-            do {
-                pthread_mutex_lock(&pipe_mutex);
-
-                // Lire la réponse du pipe
-                if (read(pipe_fd_read, valid, sizeof(valid)) == -1) {
-                    perror("read from pipe");
-                    close(client_socket);
-                    close(pipe_fd_read);
-                    pthread_exit(NULL);
-                }
-                pthread_mutex_unlock(&pipe_mutex);
-
-                printf("Initial response %s\n", valid);
-
-                // Extraire l'identifiant du thread de la réponse
-                strcpy(tid_verif, strtok(valid, "#"));
-                char* response = strtok(NULL, "");
-
-                printf("Thread response %s\n", tid_verif);
-
-                // Vérifier si l'identifiant du thread reçu correspond à l'identifiant du thread actuel
-                if (strcmp(tid_verif, tid_char) == 0) {
-                    // Les identifiants de thread correspondent, traiter la réponse
-
-                    printf("Response %s\n", response);
-                    // Envoyer la réponse au client (deuxième partie de valid)
-                    if (send(client_socket, response, strlen(response), 0) == -1) {
-                        perror("Error sending authentication response to client");
-                        close(client_socket);
-                        pthread_exit(NULL);
-                    }
-                    // Extraire le client_id de la première partie de message_content
-                    strcpy(client_id , strtok(message_content, "#"));
-                    printf("Client_id : %s\n", client_id);
-
-                    // Stocker les informations du client
-                    if (num_clients < MAX_CLIENTS) {
-                        strcpy(clients[num_clients].id, client_id);
-                        clients[num_clients].socket = client_socket;
-                        num_clients++;
-                        printf("Client %s connected\n", client_id);
-                    } else {
-                        printf("Max clients reached. Rejecting connection from client %s.\n", client_id);
-                        close(client_socket);
-                        pthread_exit(NULL);
-                    }   
-                } else {
-                    // Les identifiants de thread ne correspondent pas, continuer à lire jusqu'à ce que ce soit le bon thread
-                    printf("Received response from wrong thread. Waiting for correct thread...\n");
-                }
-                // free(response);
-            } while (strcmp(tid_verif, tid_char) != 0);
+            }   
 
             printf("That's done... Let's see\n");
 
@@ -239,26 +294,73 @@ void *handle_client(void *arg) {
                 case 'L':
                     if (strcmp(type_msg, "L_USE") == 0) { //-----------------------  List of User  -----------------------------------------
                         // Get list of connected users
+
+                        // Créer une clé pour la mémoire partagée
+                        key_t key = ftok("../memoire_partagee/mem_part.txt", 65);
+                        if (key == -1) {
+                            perror("Erreur lors de la génération de la clé");
+                            exit(EXIT_FAILURE);
+                        }
+
+                        // Obtenir l'identifiant de la mémoire partagée
+                        int shm_id = shmget(key, sizeof(char) * MAX_USERS * MAX_PSEUDO_LENGTH, 0666);
+                        if (shm_id == -1) {
+                            perror("Erreur lors de l'obtention de l'identifiant de la mémoire partagée");
+                            exit(EXIT_FAILURE);
+                        }
+
+                        // Attacher la mémoire partagée
+                        char *shared_memory = shmat(shm_id, NULL, 0);
+                        if (shared_memory == (void *)-1) {
+                            perror("Erreur lors de l'attachement de la mémoire partagée");
+                            exit(EXIT_FAILURE);
+                        }
+
+
+                        // Déclarer un tableau pour stocker les utilisateurs connectés
+                        User users[MAX_USERS];
+
+                        // Récupérer la liste des utilisateurs connectés depuis la mémoire partagée
+                        get_connected_users(shared_memory, users);
+
+                        // Afficher la liste des utilisateurs connectés
+                        printf("Liste des utilisateurs connectés :\n");
+                        for (int i = 0; i < MAX_USERS; i++) {
+                            if (strlen(users[i].pseudo) > 0) {
+                                printf("- %s\n", users[i].pseudo);
+                            }
+                        }
                         
-                        // Prepare a buffer to store the list of connected users
-                        char list[2048] = {0};
-                        
-                        // Iterate through the array of connected clients
-                        for (int i = 0; i < num_clients; i++) {
-                            // Append the client's ID (pseudo) to the list buffer
-                            strcat(list, clients[i].id);
+
+                        // Declare a buffer to store the list of connected users
+                        char list[MAX_USERS * MAX_PSEUDO_LENGTH + MAX_USERS] = {0}; // + MAX_USERS for newline characters
+
+                        // Iterate through the array of connected users
+                        for (int i = 0; i < MAX_USERS; i++) {
+                            // Append the user's pseudo to the list buffer
+                            strcat(list, shared_memory + i * MAX_PSEUDO_LENGTH);
                             strcat(list, "\n"); // Add newline for better formatting
                         }
 
                         // Send the list to the client
-                        if (send(client_socket, list, strlen(list), 0) == -1) {
-                            perror("Error sending list of users to client");
-                            close(client_socket);
-                            pthread_exit(NULL);
-                        }
+                        send_tcp(client_socket, list);
 
+                    }
+                    else if (strcmp(type_msg, "L_ACC") == 0)
+                    {
+                        // Receive pseudo and password from client
+                        char pseudo[50] = {0}; // Adjust size as needed
+                        char password[50] = {0}; // Adjust size as needed
 
-                    } else {
+                        // Extract pseudo and password from the message_content
+                        sscanf(message_content, "%49[^#]#%49s", pseudo, password);
+                        printf("Pseudo : %s\nPassword : %s\n", pseudo, password);
+
+                        write_pipe_com(message, pipe_fd_write);
+                        read_and_send_response(pipe_fd_read, client_socket, tid_char, type_msg);
+
+                    }
+                    else {
                         printf("Unknown message type: %s\n", type_msg);
                     }
                     break;
@@ -272,62 +374,11 @@ void *handle_client(void *arg) {
 
                         // Extract pseudo and password from the message_content
                         sscanf(message_content, "%49[^#]#%49s", pseudo, password);
-
                         printf("Pseudo : %s\nPassword : %s\n", pseudo, password);
 
-                        // Check if possible
-                        pthread_mutex_lock(&pipe_mutex);
+                        write_pipe_com(message, pipe_fd_write);
+                        read_and_send_response(pipe_fd_read, client_socket, tid_char, type_msg);
 
-            
-                        // Send to file_msg here
-                        if (write(pipe_fd_write, message, strlen(message)) == -1) {
-                            perror("write to pipe");
-                            close(client_socket);
-                            pthread_exit(NULL);
-                        }
-                        pthread_mutex_unlock(&pipe_mutex);
-
-                        sleep(1);
-
-                        // For now it's always good
-                        // char response[2053] ; // = 'T';
-
-                        char valid[2053] = {0} ; // = 'T';
-                        char tid_verif[2053] = {0}; 
-                       do {
-                           pthread_mutex_lock(&pipe_mutex);
-
-                            // Lire la réponse du pipe
-                            if (read(pipe_fd_read, valid, sizeof(valid)) == -1) {
-                                perror("read from pipe");
-                                close(client_socket);
-                                close(pipe_fd_read);
-                                pthread_exit(NULL);
-                            }
-                             pthread_mutex_unlock(&pipe_mutex);
-                            // Extraire l'identifiant du thread de la réponse
-                            strcpy(tid_verif, strtok(valid, "#"));
-                            char* response = strtok(NULL, "");
-
-
-                            // Vérifier si l'identifiant du thread reçu correspond à l'identifiant du thread actuel
-                            if (strcmp(tid_verif, tid_char) == 0) {
-                                // Les identifiants de thread correspondent, traiter la réponse
-
-                                // Envoyer la réponse au client (deuxième partie de valid)
-                                if (send(client_socket, response, strlen(response), 0) == -1) {
-                                    perror("Error sending create account response to client");
-                                    close(client_socket);
-                                    pthread_exit(NULL);
-                                }
-
-                            } else {
-                                // Les identifiants de thread ne correspondent pas, continuer à lire jusqu'à ce que ce soit le bon thread
-                                printf("Received response from wrong thread. Waiting for correct thread...\n");
-                            }
-                        } while (strcmp(tid_verif, tid_char) != 0);
-
-                        
                     } else {
                         printf("Unknown message type: %s\n", type_msg);
                     }
@@ -347,57 +398,10 @@ void *handle_client(void *arg) {
 
                         printf("Pseudo : %s\nPassword : %s\n", pseudo, password);
 
-                        // Delete account
-                        pthread_mutex_lock(&pipe_mutex);
+                        write_pipe_com(message, pipe_fd_write);
 
-                        // Send to file_msg here
-                        if (write(pipe_fd_write, message, strlen(message)) == -1) {
-                            perror("write to pipe");
-                            close(client_socket);
-                            pthread_exit(NULL);
-                        }
+                        read_and_send_response(pipe_fd_read, client_socket, tid_char, type_msg) ;
 
-                        pthread_mutex_unlock(&pipe_mutex);
-
-                        sleep(1);
-
-                        char valid[2053] = {0} ; // = "Success";
-                        char tid_verif[2053] = {0} ; 
-                        do {
-                            pthread_mutex_lock(&pipe_mutex);
-
-                            // Lire la réponse du pipe
-                            if (read(pipe_fd_read, valid, sizeof(valid)) == -1) {
-                                perror("read from pipe");
-                                close(client_socket);
-                                close(pipe_fd_read);
-                                pthread_exit(NULL);
-                            }
-                            pthread_mutex_unlock(&pipe_mutex);
-
-                            // Extraire l'identifiant du thread de la réponse
-                            strcpy(tid_verif, strtok(valid, "#"));
-                            char* response = strtok(NULL, "");
-
-
-                            // Vérifier si l'identifiant du thread reçu correspond à l'identifiant du thread actuel
-                            if (strcmp(tid_verif, tid_char) == 0) {
-                                // Les identifiants de thread correspondent, traiter la réponse
-
-                                // Envoyer la réponse au client (deuxième partie de valid)
-                                if (send(client_socket, response, strlen(response), 0) == -1) {
-                                    perror("Error sending delete account response to client");
-                                    close(client_socket);
-                                    pthread_exit(NULL);
-                                }
-
-                            } else {
-                                // Les identifiants de thread ne correspondent pas, continuer à lire jusqu'à ce que ce soit le bon thread
-                                printf("Received response from wrong thread. Waiting for correct thread...\n");
-                            }
-                        } while (strcmp(tid_verif, tid_char) != 0);
-
-   
 
                     } else {
                         printf("Unknown message type: %s\n", type_msg);
@@ -415,6 +419,8 @@ void *handle_client(void *arg) {
     pthread_exit(NULL);
 }
 
+
+
 int main(int argc, char const *argv[]) {
     int server_fd, new_socket;
     struct sockaddr_in address;
@@ -426,7 +432,6 @@ int main(int argc, char const *argv[]) {
         perror("mkfifo");
         exit(EXIT_FAILURE);
     }
-
 
     // Create server socket
     if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {

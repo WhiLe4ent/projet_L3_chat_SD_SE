@@ -44,6 +44,7 @@ void* message_handler(void* arg) {
         perror("write to gestion pipe");
         exit(EXIT_FAILURE);
     }
+    sleep(1);
 
     // Attendre la réponse du pipe gestion
     char buffer[2048 + 50] = {0};
@@ -147,7 +148,6 @@ int main() {
         char message[2053] = {0};
         strcpy(thread_id, strtok(buffer, "#"));
         strcpy(message, strtok(NULL, ""));
-        printf("ththth : %s\n", thread_id);
 
         // Trouver le thread disponible ou ajouter à la file d'attente
         int tid = -1;
@@ -174,7 +174,6 @@ int main() {
         }
         pthread_mutex_unlock(&mutex);
 
-        printf("ththth : %s\n", thread_id);
         if (tid != -1) {
             // Créer un thread pour traiter le message
             pthread_t thread;
@@ -192,6 +191,17 @@ int main() {
     close(pipe_com_write);
     close(pipe_gestion_read);
     close(pipe_gestion_write);
+    
+    if (unlink(PIPE_COM) == -1) {
+        perror("Error unlinking pipe");
+        return -1;
+    }
+    
+    if (unlink(PIPE_GESTION) == -1) {
+        perror("Error unlinking pipe");
+        return -1;
+    }
+
 
     return 0;
 }

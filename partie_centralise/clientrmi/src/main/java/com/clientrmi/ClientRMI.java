@@ -17,7 +17,7 @@ public class ClientRMI {
     public static void main(String[] args) {
         try {
             // Adresse IP et port du serveur RMI
-            String serverIP = "10.1.13.62"; // Remplacez par l'adresse IP du serveur
+            String serverIP = "127.0.0.1" ; // "10.1.13.62"; // Remplacez par l'adresse IP du serveur
             int serverPort = 1099; // Port par défaut
             
             // Charger le fichier de politique de sécurité

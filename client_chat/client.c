@@ -14,6 +14,7 @@
 #define PIPE_NAME_PREFIX "message_pipe_"
 #define PIPE_NAME_SIZE 100
 #define MAX_ID_LENGTH 50
+#define IP_AD "127.0.0.1"
 
 // Mutex for pipe access
 pthread_mutex_t pipe_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -373,6 +374,23 @@ void delete_existing_account(int sock) {
 }
 
 
+void log_out(int sock , char *pseudo){
+
+    // Password just to have something for the strtok
+    char password[50] = "mdpp"; 
+
+    // Construct message with prefix D_ACC, pseudo, and password separated by a delimiter
+    char msg[150]; // Adjust size as needed
+    snprintf(msg, sizeof(msg), "L_ACC%s#%s", pseudo, password);
+
+    if (send(sock, msg, strlen(msg), 0) == -1) {
+        perror("Error sending delete account request to server");
+        return;
+    }
+
+}
+
+
 
 int get_choice() {
     int choice;
@@ -450,8 +468,12 @@ int main(int argc, char const *argv[]) {
                 // Log out of the system -----------------------------------------------------------------
                 case 2:
 
+                    log_out(sock, args.client_id) ;
+
                     // Close the socket
                     close(sock);
+
+                    close(args.pipe_fd);
 
                     // Unlink the pipe file
                     if (unlink(args.pipe_name) == -1) {
@@ -525,7 +547,7 @@ int main(int argc, char const *argv[]) {
                     serv_addr.sin_port = htons(PORT);
 
                     // Convert IP address from text to binary form
-                    if (inet_pton(AF_INET, "10.1.13.55", &serv_addr.sin_addr) <= 0) {
+                    if (inet_pton(AF_INET, IP_AD, &serv_addr.sin_addr) <= 0) {
                         printf("\nInvalid address/ Address not supported\n");
                         return -1;
                     }
@@ -610,7 +632,7 @@ int main(int argc, char const *argv[]) {
                     serv_addr.sin_port = htons(PORT);
 
                     // Convert IP address from text to binary form
-                    if (inet_pton(AF_INET, "10.1.13.55", &serv_addr.sin_addr) <= 0) {
+                    if (inet_pton(AF_INET, IP_AD, &serv_addr.sin_addr) <= 0) {
                         printf("\nInvalid address/ Address not supported\n");
                         return -1;
                     }

@@ -1,5 +1,4 @@
-nouveauPseudo#nouveauMDP
-pseudo#mdp
+pseudo#mdpp
 Achille#yolo
 mateo#molo
 baptou#molo
