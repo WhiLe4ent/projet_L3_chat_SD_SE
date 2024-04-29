@@ -8,10 +8,10 @@
 #include <semaphore.h>
 #include <signal.h>
 
-#define PIPE_TO_GESTION "../pipe_to_gestion"
-#define PIPE_GEST_TO_FILE_MSG "../pipe_gest_to_file_msg"
-#define PIPE_COM_TO_FILE_MSG "../pipe_com_to_file_msg"
-#define PIPE_TO_COM "../pipe_to_com"
+#define PIPE_TO_GESTION "./pipe_to_gestion"
+#define PIPE_GEST_TO_FILE_MSG "./pipe_gest_to_file_msg"
+#define PIPE_COM_TO_FILE_MSG "./pipe_com_to_file_msg"
+#define PIPE_TO_COM "./pipe_to_com"
 
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
@@ -68,6 +68,8 @@ void* message_handler(void* arg) {
     // Attendre le signal pour commencer le traitement
     sem_wait(&msg_info->thread_infos[msg_info->tid].semaphore);
 
+    sleep(5);
+
     // Envoyer le message au pipe gestion
     printf("Sending message to gestion pipe: %s\n", msg_info->message);
     if (write(pipe_to_gestion_write, msg_info->message, strlen(msg_info->message)) == -1) {
@@ -109,6 +111,7 @@ void* message_handler(void* arg) {
 }
 
 int main() {
+    printf("Welcome to file_msg\n");
     // Créer les pipes ---------------------------------------------------------
 
     if (mkfifo(PIPE_TO_GESTION, 0666) == -1) {
@@ -125,13 +128,13 @@ int main() {
 
     // Ouvrir les pipes en écriture ---------------------------------------------------------
 
-    pipe_to_com_write = open(PIPE_TO_COM, O_WRONLY);
+    pipe_to_com_write = open(PIPE_TO_COM, O_RDWR);
     if (pipe_to_com_write == -1) {
         perror("open");
         exit(EXIT_FAILURE);
     }
 
-    pipe_to_gestion_write = open(PIPE_TO_GESTION, O_WRONLY);
+    pipe_to_gestion_write = open(PIPE_TO_GESTION, O_RDWR);
     if (pipe_to_gestion_write == -1) {
         perror("open");
         exit(EXIT_FAILURE);
@@ -139,12 +142,12 @@ int main() {
 
     // Ouvrir les pipes en lecture ---------------------------------------------------------
 
-    pipe_gest_to_file_msg_read = open(PIPE_GEST_TO_FILE_MSG, O_RDONLY);
+    pipe_gest_to_file_msg_read = open(PIPE_GEST_TO_FILE_MSG, O_RDWR);
     if (pipe_gest_to_file_msg_read == -1) {
         perror("open");
         exit(EXIT_FAILURE);
     }
-    pipe_com_to_file_msg_read = open(PIPE_COM_TO_FILE_MSG, O_RDONLY);
+    pipe_com_to_file_msg_read = open(PIPE_COM_TO_FILE_MSG, O_RDWR);
     if (pipe_com_to_file_msg_read == -1) {
         perror("open");
         exit(EXIT_FAILURE);

@@ -11,8 +11,8 @@
 #include <sys/shm.h>
 #include <signal.h>
 
-#define PIPE_TO_GESTION "../pipe_to_gestion"
-#define PIPE_TO_FILE_MSG "../pipe_gest_to_file_msg"
+#define PIPE_TO_GESTION "./pipe_to_gestion"
+#define PIPE_TO_FILE_MSG "./pipe_gest_to_file_msg"
 #define MAX_MESSAGE_SIZE 2053
 #define PORT 4003
 
@@ -27,7 +27,7 @@ int shmid ;
 
 void create_shared_memory() {
     // Générer une clé unique avec ftok
-    key_t key = ftok("../memoire_partagee/mem_part.txt", 65);
+    key_t key = ftok("./memoire_partagee/mem_part.txt", 65);
 
     // Créer ou localiser un segment de mémoire partagée
     shmid = shmget(key, sizeof(char) * ROWS * COLS, IPC_CREAT | 0666);
@@ -236,6 +236,8 @@ void handle_message(char message[MAX_MESSAGE_SIZE], int sockfd, struct sockaddr_
 }
 
 int main() {
+    printf("Welcome to gest_req\n");
+
     // Création du socket UDP
     int sockfd;
     if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
@@ -250,7 +252,7 @@ int main() {
     servaddr.sin_addr.s_addr = inet_addr("127.0.0.1"); // Adresse IP du client RMI
 
     // Ouvrir le pipe gestion en lecture
-    int pipe_TO_gestion_read = open(PIPE_TO_GESTION, O_RDONLY);
+    int pipe_TO_gestion_read = open(PIPE_TO_GESTION, O_RDWR);
     if (pipe_TO_gestion_read == -1) {
         perror("open");
         exit(EXIT_FAILURE);
@@ -258,7 +260,7 @@ int main() {
 
 
     // Ouvrir le nouveau pipe en écriture
-    int pipe_to_file_msg_write = open(PIPE_TO_FILE_MSG, O_WRONLY);
+    int pipe_to_file_msg_write = open(PIPE_TO_FILE_MSG, O_RDWR);
     if (pipe_to_file_msg_write == -1) {
         perror("open");
         exit(EXIT_FAILURE);

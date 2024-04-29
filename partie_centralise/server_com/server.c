@@ -11,8 +11,8 @@
 #include <sys/ipc.h>
 #include <sys/shm.h>
 
-#define PIPE_COM_TO_FILE_MSG "../pipe_com_to_file_msg"
-#define PIPE_TO_COM "../pipe_to_com"
+#define PIPE_COM_TO_FILE_MSG "./pipe_com_to_file_msg"
+#define PIPE_TO_COM "./pipe_to_com"
 
 
 #define PORT 8080
@@ -28,6 +28,9 @@
 
 
 int pipe_to_com_read, pipe_com_to_file_write;
+
+
+char *shared_memory;
 
 
 typedef struct {
@@ -69,7 +72,7 @@ void cleanup() {
 
 void create_shared_memory(char **shared_memory) {
     // Générer une clé unique avec ftok
-    key_t key = ftok("../memoire_partagee/mem_part.txt", 65);
+    key_t key = ftok("./memoire_partagee/mem_part.txt", 65);
 
     // Créer ou localiser un segment de mémoire partagée
     int shmid = shmget(key, sizeof(char) * ROWS * COLS, IPC_CREAT | 0666);
@@ -184,15 +187,20 @@ void *handle_client(void *arg) {
 
     char buffer[2048 + 5 + 100] = {0};
 
+
+    // Créer l'espace de mémoire partagée
+    create_shared_memory(&shared_memory);
+
+
     // Open the named pipe for reading and writing
-    pipe_to_com_read = open(PIPE_TO_COM, O_RDONLY);
+    pipe_to_com_read = open(PIPE_TO_COM, O_RDWR);
     if (pipe_to_com_read == -1) {
         perror("open");
         // close(client_socket);
         pthread_exit(NULL);
     }
     // Open the named pipe for reading and writing
-    pipe_com_to_file_write = open(PIPE_COM_TO_FILE_MSG, O_WRONLY);
+    pipe_com_to_file_write = open(PIPE_COM_TO_FILE_MSG, O_RDWR);
     if (pipe_com_to_file_write == -1) {
         perror("open");
         // close(client_socket);
@@ -322,10 +330,6 @@ void *handle_client(void *arg) {
                     if (strcmp(type_msg, "L_USE") == 0) { //-----------------------  List of User  -----------------------------------------
                         // Get list of connected users
 
-                        // Créer l'espace de mémoire partagée
-                        char *shared_memory;
-                        create_shared_memory(&shared_memory);
-                        sleep(1);
                         // Récupérer la liste des utilisateurs connectés depuis la mémoire partagée
                         User users[MAX_USERS];
                         get_connected_users(shared_memory, users);
@@ -353,8 +357,6 @@ void *handle_client(void *arg) {
                         send_tcp(client_socket, list);
                         
 
-                        // Détacher l'espace de mémoire partagée
-                        detach_shared_memory(shared_memory);
 
                     }
                     else if (strcmp(type_msg, "L_ACC") == 0)
@@ -369,6 +371,10 @@ void *handle_client(void *arg) {
 
                         write_pipe_com(message, pipe_com_to_file_write);
                         read_and_send_response( client_socket, tid_char, type_msg, pipe_to_com_read);
+
+                        // Détacher l'espace de mémoire partagée
+                        detach_shared_memory(shared_memory);
+
 
                     }
                     else {
@@ -426,6 +432,9 @@ void *handle_client(void *arg) {
             }
         }
     }
+
+    // Détacher l'espace de mémoire partagée
+    detach_shared_memory(shared_memory);
 
     pthread_exit(NULL);
 }

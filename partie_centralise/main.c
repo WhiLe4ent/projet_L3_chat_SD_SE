@@ -28,6 +28,7 @@ int main() {
         perror("Erreur lors de la création du processus serveur");
         exit(EXIT_FAILURE);
     }
+    sleep(1);
 
     pid_t pid_file_msg = fork();
     if (pid_file_msg == 0) {
@@ -39,6 +40,7 @@ int main() {
         perror("Erreur lors de la création du processus file_msg");
         exit(EXIT_FAILURE);
     }
+    sleep(1);
 
     pid_t pid_gest_req = fork();
     if (pid_gest_req == 0) {
@@ -50,6 +52,7 @@ int main() {
         perror("Erreur lors de la création du processus gest_req");
         exit(EXIT_FAILURE);
     }
+    sleep(1);
 
     // Attendre la fin des processus enfants
     waitpid(pid_server, NULL, 0);
@@ -58,22 +61,22 @@ int main() {
 
     // Supprimer les pipes
 
-    if (unlink(PIPE_TO_GESTION) == -1) {
-        perror("unlink");
-        exit(EXIT_FAILURE);
-    }
-    if (unlink(PIPE_GEST_TO_FILE_MSG) == -1) {
-        perror("unlink");
-        exit(EXIT_FAILURE);
-    }
-    if (unlink(PIPE_COM_TO_FILE_MSG) == -1) {
-        perror("unlink");
-        exit(EXIT_FAILURE);
-    }
-    if (unlink(PIPE_TO_COM) == -1) {
-        perror("unlink");
-        exit(EXIT_FAILURE);
-    }
+    // if (unlink(PIPE_TO_GESTION) == -1) {
+    //     perror("unlink");
+    //     exit(EXIT_FAILURE);
+    // }
+    // if (unlink(PIPE_GEST_TO_FILE_MSG) == -1) {
+    //     perror("unlink");
+    //     exit(EXIT_FAILURE);
+    // }
+    // if (unlink(PIPE_COM_TO_FILE_MSG) == -1) {
+    //     perror("unlink");
+    //     exit(EXIT_FAILURE);
+    // }
+    // if (unlink(PIPE_TO_COM) == -1) {
+    //     perror("unlink");
+    //     exit(EXIT_FAILURE);
+    // }
 
     printf("Pipes unlinked successfully.\n");
 
