@@ -130,7 +130,6 @@ int main() {
         perror("open");
         exit(EXIT_FAILURE);
     }
-    printf("com ouvert chef \n");
 
     pipe_to_gestion_write = open(PIPE_TO_GESTION, O_WRONLY);
     if (pipe_to_gestion_write == -1) {
@@ -202,7 +201,6 @@ int main() {
         }
 
         if (tid == -1) {
-            printf("Coucou\n");
             // Aucun thread disponible, ajouter à la file d'attente
             // Allouer de la mémoire pour le message et copier le message
             tid = 0; // Arbitrairement, vous pouvez implémenter une logique plus complexe ici

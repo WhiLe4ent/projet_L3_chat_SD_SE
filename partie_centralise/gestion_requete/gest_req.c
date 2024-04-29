@@ -23,13 +23,14 @@ int next_index = 0; // Global variable to track the next available index in shar
 
 char *shared_memory = {0};
 
+int shmid ;
 
 void create_shared_memory() {
     // Générer une clé unique avec ftok
     key_t key = ftok("../memoire_partagee/mem_part.txt", 65);
 
     // Créer ou localiser un segment de mémoire partagée
-    int shmid = shmget(key, sizeof(char) * ROWS * COLS, IPC_CREAT | 0666);
+    shmid = shmget(key, sizeof(char) * ROWS * COLS, IPC_CREAT | 0666);
     if (shmid == -1) {
         perror("shmget");
         exit(EXIT_FAILURE);
@@ -47,6 +48,12 @@ void detach_shared_memory() {
     // Détacher le segment de mémoire partagée
     if (shmdt(shared_memory) == -1) {
         perror("shmdt");
+        exit(EXIT_FAILURE);
+    }
+
+        // Supprimer la mémoire partagée
+    if (shmctl(shmid, IPC_RMID, NULL) == -1) {
+        perror("shmctl");
         exit(EXIT_FAILURE);
     }
 }
@@ -67,17 +74,26 @@ void add_to_shared_memory(const char *pseudo) {
 }
 
 void remove_from_shared_memory(const char *pseudo) {
-    // Parcourir la mémoire partagée pour trouver le pseudonyme et le remplacer par une chaîne vide
+    // Parcourir la mémoire partagée pour trouver le pseudo à supprimer
     for (int i = 0; i < ROWS; i++) {
         char *current_pseudo = shared_memory + i * COLS;
         if (strcmp(current_pseudo, pseudo) == 0) {
-            // Trouvé le pseudonyme, le remplacer par une chaîne vide
-            strcpy(current_pseudo, "");
+            // Trouvé le pseudo à supprimer, puis déplacer les pseudos suivants vers le haut
+            for (int j = i; j < ROWS - 1; j++) {
+                char *next_pseudo = shared_memory + (j + 1) * COLS;
+                strcpy(current_pseudo, next_pseudo);
+                current_pseudo = next_pseudo;
+            }
+
+            // Effacer le dernier pseudonyme
+            memset(current_pseudo, 0, COLS);
+
             printf("Pseudo '%s' removed from shared memory.\n", pseudo);
             return;
         }
     }
-    // Pseudonyme non trouvé
+
+    // Pseudo non trouvé
     printf("Pseudo '%s' not found in shared memory.\n", pseudo);
 }
 
@@ -127,6 +143,7 @@ void cleanup() {
     // Code de nettoyage à exécuter avant la sortie
 
     detach_shared_memory();
+    
 
     // Supprimer le pipe
     if (unlink(PIPE_TO_GESTION) == -1) {

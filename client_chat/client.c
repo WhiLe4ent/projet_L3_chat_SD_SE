@@ -98,7 +98,7 @@ void *receive_and_send_to_pipe(void *arg) {
     int sock = args->sock;
     int pipe_fd = args->pipe_fd;
 
-    char buffer[1024];
+    char buffer[2053];
 
     while (1) {
         memset(buffer, 0, sizeof(buffer));
@@ -443,10 +443,10 @@ int main(int argc, char const *argv[]) {
     struct ThreadArgs args;
 
 
-    // if (signal(SIGINT, cleanup) == SIG_ERR) {
-    //     perror("signal");
-    //     exit(EXIT_FAILURE);
-    // }
+    if (signal(SIGINT, cleanup) == SIG_ERR) {
+        perror("signal");
+        exit(EXIT_FAILURE);
+    }
 
 
     while (1) {
@@ -459,7 +459,6 @@ int main(int argc, char const *argv[]) {
                 // Write a message : ---------------------------------------------------------------------
                 case 1:{
 
-                    // Create a struct to hold socket, client ID, and pipe file descriptor
                     args.sock = sock;
                     // Open the pipe for writing
                     int pipe_fd = open(args.pipe_name, O_WRONLY);
@@ -493,6 +492,9 @@ int main(int argc, char const *argv[]) {
                     // Close the socket
                     close(sock);
 
+                    is_connected = 0;
+                    args.is_connected = 0 ;
+                    
                     close(args.pipe_fd);
 
                     // Unlink the pipe file
@@ -500,7 +502,6 @@ int main(int argc, char const *argv[]) {
                         perror("Error unlinking pipe");
                         return -1;
                     }
-                    is_connected = 0;
 
                     break;
 

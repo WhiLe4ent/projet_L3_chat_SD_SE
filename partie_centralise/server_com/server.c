@@ -27,29 +27,12 @@
 #define COLS 50
 
 
-// char *pipe_w_file = "../pipe_com_to_file_msg";
-// char *pipe_r_com = "../pipe_to_com";
-
-
-
 int pipe_to_com_read, pipe_com_to_file_write;
-
 
 
 typedef struct {
     char pseudo[MAX_PSEUDO_LENGTH];
 } User;
-
-
-
-int count_digits(unsigned long num) {
-    int count = 0;
-    while (num != 0) {
-        num /= 10;
-        count++;
-    }
-    return count;
-}
 
 
 // Structure to hold client information
@@ -201,10 +184,8 @@ void *handle_client(void *arg) {
 
     char buffer[2048 + 5 + 100] = {0};
 
-    printf("coucou\n");
     // Open the named pipe for reading and writing
     pipe_to_com_read = open(PIPE_TO_COM, O_RDONLY);
-    printf("coucou\n"); 
     if (pipe_to_com_read == -1) {
         perror("open");
         // close(client_socket);
@@ -344,7 +325,7 @@ void *handle_client(void *arg) {
                         // Créer l'espace de mémoire partagée
                         char *shared_memory;
                         create_shared_memory(&shared_memory);
-
+                        sleep(1);
                         // Récupérer la liste des utilisateurs connectés depuis la mémoire partagée
                         User users[MAX_USERS];
                         get_connected_users(shared_memory, users);
@@ -491,7 +472,7 @@ int main(int argc, char const *argv[]) {
     }
 
     // Listen for incoming connections ---------------------------------------------------------
-    if (listen(server_fd, 3) < 0) {
+    if (listen(server_fd, 10) < 0) {
         perror("listen");
         exit(EXIT_FAILURE);
     }
