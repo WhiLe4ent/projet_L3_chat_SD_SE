@@ -14,7 +14,6 @@
 #define PIPE_COM_TO_FILE_MSG "../pipe_com_to_file_msg"
 #define PIPE_TO_COM "../pipe_to_com"
 
-int pipe_read, pipe_write;
 
 #define PORT 8080
 #define MAX_CLIENTS 10 // Maximum number of clients
@@ -28,13 +27,18 @@ int pipe_read, pipe_write;
 #define COLS 50
 
 
+// char *pipe_w_file = "../pipe_com_to_file_msg";
+// char *pipe_r_com = "../pipe_to_com";
+
+
+
+int pipe_to_com_read, pipe_com_to_file_write;
+
+
 
 typedef struct {
     char pseudo[MAX_PSEUDO_LENGTH];
 } User;
-
-
-pthread_mutex_t pipe_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 
 
@@ -122,11 +126,11 @@ void get_connected_users(char *shared_memory, User *users) {
 }
 
 
-void write_pipe_com( char *message){
+void write_pipe_com( char *message, int pipe_com_to_file_write){
 
 
     // Authentication here
-    if (write(pipe_write, message, strlen(message)) == -1) {
+    if (write(pipe_com_to_file_write, message, strlen(message)) == -1) {
         perror("write to pipe");
         pthread_exit(NULL);
     }
@@ -135,10 +139,10 @@ void write_pipe_com( char *message){
 }
 
 
-void read_pipe_com(char *response) {
+void read_pipe_com(char *response, int pipe_to_com_read) {
 
     // Read from the named pipe
-    ssize_t bytes_read = read(pipe_read, response, 2053 - 1);
+    ssize_t bytes_read = read(pipe_to_com_read, response, 2053 - 1);
     if (bytes_read == -1) {
         perror("read from pipe");
         pthread_exit(NULL);
@@ -160,13 +164,13 @@ void send_tcp( int client_socket, char *message){
 }
 
 
-void read_and_send_response( int client_socket, const char *tid_char, char *type_msg) {
+void read_and_send_response( int client_socket, const char *tid_char, char *type_msg, int pipe_to_com_read) {
     char response[2053] = {0}; // Buffer for storing the response
     char tid_verif[2053] = {0}; // Buffer for storing the thread identifier received from the response
 
     do {
         // Read the response from the pipe
-        read_pipe_com(response);
+        read_pipe_com(response, pipe_to_com_read);
         printf("Initial response from pipe com : %s\n", response);
 
         // Extract the thread identifier and response from the received message
@@ -191,27 +195,29 @@ void read_and_send_response( int client_socket, const char *tid_char, char *type
 
 // Function to handle each client connection
 void *handle_client(void *arg) {
-    int client_socket = *((int *)arg);
+    int client_socket = *((int*)arg);
     char client_id[MAX_ID_LENGTH] = {0};
     int index = -1;
 
     char buffer[2048 + 5 + 100] = {0};
 
+    printf("coucou\n");
     // Open the named pipe for reading and writing
-    pipe_write = open(PIPE_COM_TO_FILE_MSG, O_WRONLY);
-    if (pipe_write == -1) {
+    pipe_to_com_read = open(PIPE_TO_COM, O_RDONLY);
+    printf("coucou\n"); 
+    if (pipe_to_com_read == -1) {
         perror("open");
-        close(client_socket);
+        // close(client_socket);
+        pthread_exit(NULL);
+    }
+    // Open the named pipe for reading and writing
+    pipe_com_to_file_write = open(PIPE_COM_TO_FILE_MSG, O_WRONLY);
+    if (pipe_com_to_file_write == -1) {
+        perror("open");
+        // close(client_socket);
         pthread_exit(NULL);
     }
 
-    // Open the named pipe for reading and writing
-    pipe_read = open(PIPE_TO_COM, O_RDONLY);
-    if (pipe_read == -1) {
-        perror("open");
-        close(client_socket);
-        pthread_exit(NULL);
-    }
 
     pthread_t thread_id = pthread_self(); // Get the ID of the current thread
 
@@ -285,10 +291,10 @@ void *handle_client(void *arg) {
             printf("Authentication\n");
 
 
-            write_pipe_com(message);
+            write_pipe_com(message, pipe_com_to_file_write);
 
            
-            read_and_send_response( client_socket, tid_char, type_msg);
+            read_and_send_response( client_socket, tid_char, type_msg, pipe_to_com_read);
 
 
             // Extraire le client_id de la première partie de message_content
@@ -380,8 +386,8 @@ void *handle_client(void *arg) {
                         sscanf(message_content, "%49[^#]#%49s", pseudo, password);
                         printf("Pseudo : %s\nPassword : %s\n", pseudo, password);
 
-                        write_pipe_com(message);
-                        read_and_send_response( client_socket, tid_char, type_msg);
+                        write_pipe_com(message, pipe_com_to_file_write);
+                        read_and_send_response( client_socket, tid_char, type_msg, pipe_to_com_read);
 
                     }
                     else {
@@ -400,8 +406,8 @@ void *handle_client(void *arg) {
                         sscanf(message_content, "%49[^#]#%49s", pseudo, password);
                         printf("Pseudo : %s\nPassword : %s\n", pseudo, password);
 
-                        write_pipe_com(message );
-                        read_and_send_response( client_socket, tid_char, type_msg);
+                        write_pipe_com(message , pipe_com_to_file_write);
+                        read_and_send_response( client_socket, tid_char, type_msg, pipe_to_com_read);
 
                     } else {
                         printf("Unknown message type: %s\n", type_msg);
@@ -422,9 +428,9 @@ void *handle_client(void *arg) {
 
                         printf("Pseudo : %s\nPassword : %s\n", pseudo, password);
 
-                        write_pipe_com(message);
+                        write_pipe_com(message, pipe_com_to_file_write);
 
-                        read_and_send_response( client_socket, tid_char, type_msg) ;
+                        read_and_send_response( client_socket, tid_char, type_msg, pipe_to_com_read) ;
 
 
                     } else {
@@ -451,6 +457,7 @@ int main(int argc, char const *argv[]) {
     int opt = 1;
     int addrlen = sizeof(address);
     
+
     // Create the named pipe ---------------------------------------------------------
     if (mkfifo(PIPE_COM_TO_FILE_MSG, 0666) == -1) {
         perror("mkfifo");
@@ -460,6 +467,7 @@ int main(int argc, char const *argv[]) {
         perror("mkfifo");
         exit(EXIT_FAILURE);
     }
+
 
     // Create server socket ---------------------------------------------------------
     if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
@@ -483,7 +491,7 @@ int main(int argc, char const *argv[]) {
     }
 
     // Listen for incoming connections ---------------------------------------------------------
-    if (listen(server_fd, 10) < 0) {
+    if (listen(server_fd, 3) < 0) {
         perror("listen");
         exit(EXIT_FAILURE);
     }
@@ -491,12 +499,12 @@ int main(int argc, char const *argv[]) {
     printf("Server listening on port %d...\n", PORT);
 
     while (1) {
-        // Accept incoming connection
+         // Accept incoming connection
         if ((new_socket = accept(server_fd, (struct sockaddr *)&address, (socklen_t *)&addrlen)) < 0) {
             perror("accept");
             exit(EXIT_FAILURE);
         }
-        printf("Welcome in the server");
+        printf("Welcome in the server\n");
 
         // Create a new thread to handle the client
         pthread_t client_thread;

@@ -125,13 +125,15 @@ int main() {
 
     // Ouvrir les pipes en écriture ---------------------------------------------------------
 
-    pipe_to_gestion_write = open(PIPE_TO_GESTION, O_WRONLY);
-    if (pipe_to_gestion_write == -1) {
+    pipe_to_com_write = open(PIPE_TO_COM, O_WRONLY);
+    if (pipe_to_com_write == -1) {
         perror("open");
         exit(EXIT_FAILURE);
     }
-    pipe_to_com_write = open(PIPE_TO_COM, O_WRONLY);
-    if (pipe_to_com_write == -1) {
+    printf("com ouvert chef \n");
+
+    pipe_to_gestion_write = open(PIPE_TO_GESTION, O_WRONLY);
+    if (pipe_to_gestion_write == -1) {
         perror("open");
         exit(EXIT_FAILURE);
     }
