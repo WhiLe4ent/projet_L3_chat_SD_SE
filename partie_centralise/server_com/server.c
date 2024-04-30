@@ -27,6 +27,9 @@
 #define COLS 50
 
 
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+
+
 int pipe_to_com_read, pipe_com_to_file_write;
 
 
@@ -114,13 +117,14 @@ void get_connected_users(char *shared_memory, User *users) {
 
 void write_pipe_com( char *message, int pipe_com_to_file_write){
 
-
+    pthread_mutex_lock(&mutex);
     // Authentication here
     if (write(pipe_com_to_file_write, message, strlen(message)) == -1) {
         perror("write to pipe");
         pthread_exit(NULL);
     }
 
+    pthread_mutex_unlock(&mutex);
 
 }
 
@@ -151,10 +155,12 @@ void send_tcp( int client_socket, char *message){
 
 
 void read_and_send_response( int client_socket, const char *tid_char, char *type_msg, int pipe_to_com_read) {
-    char response[2053] = {0}; // Buffer for storing the response
+
     char tid_verif[2053] = {0}; // Buffer for storing the thread identifier received from the response
+    char response[2053] = {0}; // Buffer for storing the response
 
     do {
+
         // Read the response from the pipe
         read_pipe_com(response, pipe_to_com_read);
         printf("Initial response from pipe com : %s\n", response);
@@ -447,17 +453,6 @@ int main(int argc, char const *argv[]) {
     int opt = 1;
     int addrlen = sizeof(address);
     
-
-    // Create the named pipe ---------------------------------------------------------
-    if (mkfifo(PIPE_COM_TO_FILE_MSG, 0666) == -1) {
-        perror("mkfifo");
-        exit(EXIT_FAILURE);
-    }
-    if (mkfifo(PIPE_TO_COM, 0666) == -1) {
-        perror("mkfifo");
-        exit(EXIT_FAILURE);
-    }
-
 
     // Create server socket ---------------------------------------------------------
     if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {

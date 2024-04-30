@@ -125,7 +125,8 @@ void *receive_and_send_to_pipe(void *arg) {
 // -----------------------------------------------------------     MENU  FUNCTION    ------------------------------------------------------------------------------------------
 
 void clear_console() {
-    printf("\033[2J\033[H"); // Clear the console (Linux)
+    system("clear");
+    // printf("\033[2J\033[H"); // Clear the console (Linux)
 }
 
 

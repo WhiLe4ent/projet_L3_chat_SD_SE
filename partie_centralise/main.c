@@ -1,8 +1,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <pthread.h>
-#include <sys/wait.h>
+
+#include <fcntl.h>
+#include <arpa/inet.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <signal.h>
 
 
 #define PIPE_TO_GESTION "./pipe_to_gestion"
@@ -11,53 +18,67 @@
 #define PIPE_TO_COM "./pipe_to_com"
 
 
+
+#define ROWS 10
+#define COLS 50
+
+
+void create_shared_memory() {
+    // Générer une clé unique avec ftok
+    key_t key = ftok("./memoire_partagee/mem_part.txt", 65);
+
+    // Créer ou localiser un segment de mémoire partagée
+    int shmid = shmget(key, sizeof(char) * ROWS * COLS, IPC_CREAT | 0666);
+    if (shmid == -1) {
+        perror("shmget");
+        exit(EXIT_FAILURE);
+    }
+
+    // Attacher le segment de mémoire partagée
+    char *shared_memory = (char *)shmat(shmid, NULL, 0);
+    if (shared_memory == (char *)-1) {
+        perror("shmat");
+        exit(EXIT_FAILURE);
+    }
+}
+
 int main() {
+
+    // Create the named pipe ---------------------------------------------------------
+    if (mkfifo(PIPE_COM_TO_FILE_MSG, 0666) == -1) {
+        perror("mkfifo");
+        exit(EXIT_FAILURE);
+    }
+    if (mkfifo(PIPE_TO_COM, 0666) == -1) {
+        perror("mkfifo");
+        exit(EXIT_FAILURE);
+    }
+        // Créer les pipes
+    if (mkfifo(PIPE_TO_GESTION, 0666) == -1) {
+        perror("mkfifo");
+        exit(EXIT_FAILURE);
+    }
+    if (mkfifo(PIPE_GEST_TO_FILE_MSG, 0666) == -1) {
+        perror("mkfifo");
+        exit(EXIT_FAILURE);
+    }
+    create_shared_memory();
+
+
     // Compiler les fichiers source
     system("gcc ./server_com/server.c -o ./server_com/server -pthread");
     system("gcc ./file_message/file_msg.c -o ./file_message/file_msg -pthread");
     system("gcc ./gestion_requete/gest_req.c -o ./gestion_requete/gest_req -pthread");
 
-    // Lancer les programmes dans des processus enfants
-    pid_t pid_server = fork();
-    if (pid_server == 0) {
-        // Processus enfant pour le serveur
-        execlp("gnome-terminal", "gnome-terminal", "--", "./server_com/server", NULL);
-        perror("Erreur lors du démarrage du serveur");
-        exit(EXIT_FAILURE);
-    } else if (pid_server < 0) {
-        perror("Erreur lors de la création du processus serveur");
-        exit(EXIT_FAILURE);
-    }
-    sleep(1);
+    int server = system("gnome-terminal -- ./server_com/server");
 
-    pid_t pid_file_msg = fork();
-    if (pid_file_msg == 0) {
-        // Processus enfant pour file_msg
-        execlp("gnome-terminal", "gnome-terminal", "--", "./file_message/file_msg", NULL);
-        perror("Erreur lors du démarrage de file_msg");
-        exit(EXIT_FAILURE);
-    } else if (pid_file_msg < 0) {
-        perror("Erreur lors de la création du processus file_msg");
-        exit(EXIT_FAILURE);
-    }
-    sleep(1);
+    // pour file_msg
+    int file_msg = system("gnome-terminal -- ./file_message/file_msg");
 
-    pid_t pid_gest_req = fork();
-    if (pid_gest_req == 0) {
-        // Processus enfant pour gest_req
-        execlp("gnome-terminal", "gnome-terminal", "--", "./gestion_requete/gest_req", NULL);
-        perror("Erreur lors du démarrage de gest_req");
-        exit(EXIT_FAILURE);
-    } else if (pid_gest_req < 0) {
-        perror("Erreur lors de la création du processus gest_req");
-        exit(EXIT_FAILURE);
-    }
-    sleep(1);
+    // pour gest_req
+    int gest_req = system("gnome-terminal -- ./gestion_requete/gest_req");
 
-    // Attendre la fin des processus enfants
-    waitpid(pid_server, NULL, 0);
-    waitpid(pid_file_msg, NULL, 0);
-    waitpid(pid_gest_req, NULL, 0);
+
 
     // Supprimer les pipes
 
@@ -78,7 +99,6 @@ int main() {
     //     exit(EXIT_FAILURE);
     // }
 
-    printf("Pipes unlinked successfully.\n");
 
     return 0;
 }
