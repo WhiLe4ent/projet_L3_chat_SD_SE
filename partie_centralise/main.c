@@ -60,7 +60,7 @@ int main() {
     create_shared_memory();
 
 
-    // Compiler les fichiers source
+    // Compiling source file
     if(system("gcc ./server_com/server.c -o ./server_com/server -pthread") != 0){
         printf("erver compilation failed\n");
     }
@@ -70,6 +70,8 @@ int main() {
     if(system("gcc ./gestion_requete/gest_req.c -o ./gestion_requete/gest_req -pthread")!= 0){
         printf("gestion_req compilation failed\n");
     }
+    // wait 10 millisecondes to finish compiling
+    usleep(10000); 
 
     int server = system("gnome-terminal -- ./server_com/server");
 
@@ -78,27 +80,6 @@ int main() {
 
     // pour gest_req
     int gest_req = system("gnome-terminal -- ./gestion_requete/gest_req");
-
-
-
-    // Supprimer les pipes
-
-    // if (unlink(PIPE_TO_GESTION) == -1) {
-    //     perror("unlink");
-    //     exit(EXIT_FAILURE);
-    // }
-    // if (unlink(PIPE_GEST_TO_FILE_MSG) == -1) {
-    //     perror("unlink");
-    //     exit(EXIT_FAILURE);
-    // }
-    // if (unlink(PIPE_COM_TO_FILE_MSG) == -1) {
-    //     perror("unlink");
-    //     exit(EXIT_FAILURE);
-    // }
-    // if (unlink(PIPE_TO_COM) == -1) {
-    //     perror("unlink");
-    //     exit(EXIT_FAILURE);
-    // }
 
 
     return 0;
