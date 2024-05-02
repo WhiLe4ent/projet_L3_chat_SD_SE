@@ -40,6 +40,13 @@ void cleanup() {
     // Détruire le mutex
     pthread_mutex_destroy(&mutex);
 
+
+    // Fermer les pipes
+    close(pipe_to_gestion_write);
+    close(pipe_gest_to_file_msg_read);
+    close(pipe_com_to_file_msg_read);
+    close(pipe_to_com_write);
+
     // Supprimer les pipes
     if (unlink(PIPE_TO_GESTION) == -1) {
         perror("unlink");
@@ -62,7 +69,13 @@ void cleanup() {
     exit(EXIT_FAILURE);
 }
 
-// Fonction exécutée par chaque thread pour traiter les messages
+
+/**
+ * @brief Thread pour traiter les messages
+ * 
+ * @param arg Structure MessageInfo avec le message et le tid
+ * @return NULL
+ */
 void* message_handler(void* arg) {
     MessageInfo* msg_info = (MessageInfo*)arg;
 
@@ -71,12 +84,6 @@ void* message_handler(void* arg) {
 
     // Attente pour acquérir le sémaphore
     sem_wait(&semaphore);
-
-
-
-    printf("On attend un peu dans le thread %s \n", msg_info->message);
-    printf("On attend un peu dans le thread %s \n", msg_info->tid_s);
-    sleep(5);
 
     // Envoyer le message au pipe gestion
     printf("Sending message to gestion pipe: %s\n", msg_info->message);
@@ -114,6 +121,7 @@ void* message_handler(void* arg) {
         perror("write to com pipe");
         exit(EXIT_FAILURE);
     }
+    printf("Done !\n");
 
     // Libérer le sémaphore
     sem_post(&semaphore);
@@ -127,9 +135,10 @@ void* message_handler(void* arg) {
     return NULL;
 }
 
+
+
 int main() {
     printf("Welcome to file_msg\n");
-
 
 
     ssize_t bytes_read;
@@ -175,7 +184,6 @@ int main() {
 
 
     while (1) {
-        printf("Start of da loop\n");
         // Lire le message du pipe message
         char buffer[2048 + 50] = {0};
         bytes_read = read(pipe_com_to_file_msg_read, buffer, sizeof(buffer));
@@ -189,7 +197,7 @@ int main() {
             continue;
         }
 
-        // Extraire le thread_id du message
+        // Extraire thread_id du message
         char thread_id[20] = {0};
         char message[2053] = {0};
         strcpy(thread_id, strtok(buffer, "#"));

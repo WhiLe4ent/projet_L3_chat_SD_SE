@@ -151,7 +151,7 @@ void cleanup() {
         exit(EXIT_FAILURE);
     }
 
-    printf("Pipe unlinked successfully.\n");
+    printf("Clean exit.\n");
     exit(EXIT_FAILURE);
 }
 

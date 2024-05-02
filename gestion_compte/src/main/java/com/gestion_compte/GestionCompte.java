@@ -130,7 +130,6 @@ public class GestionCompte extends UnicastRemoteObject implements ICompte {
             if (infoCompte.length == 2) {
                 String pseudoFromFile = infoCompte[0].trim();
                 String mdpFromFile = infoCompte[1].trim();
-                System.out.println("Comptes présent : " + pseudoFromFile + " " + mdpFromFile);
                 if (pseudoFromFile.equals(pseudo.trim()) && mdpFromFile.equals(mdp.trim())) {
                     // Si le compte est trouvé et le mot de passe correspond, renvoyer true
                     System.out.println("Connexion réussie pour " + pseudo + " " + mdp);

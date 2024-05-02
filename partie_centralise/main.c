@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#include <fcntl.h>
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -23,6 +22,7 @@
 #define COLS 50
 
 
+
 void create_shared_memory() {
     // Générer une clé unique avec ftok
     key_t key = ftok("./memoire_partagee/mem_part.txt", 65);
@@ -34,12 +34,7 @@ void create_shared_memory() {
         exit(EXIT_FAILURE);
     }
 
-    // Attacher le segment de mémoire partagée
-    char *shared_memory = (char *)shmat(shmid, NULL, 0);
-    if (shared_memory == (char *)-1) {
-        perror("shmat");
-        exit(EXIT_FAILURE);
-    }
+
 }
 
 int main() {
@@ -66,9 +61,15 @@ int main() {
 
 
     // Compiler les fichiers source
-    system("gcc ./server_com/server.c -o ./server_com/server -pthread");
-    system("gcc ./file_message/file_msg.c -o ./file_message/file_msg -pthread");
-    system("gcc ./gestion_requete/gest_req.c -o ./gestion_requete/gest_req -pthread");
+    if(system("gcc ./server_com/server.c -o ./server_com/server -pthread") != 0){
+        printf("erver compilation failed\n");
+    }
+    if(system("gcc ./file_message/file_msg.c -o ./file_message/file_msg -pthread") !=0){
+           printf("file_msg compilation failed\n");
+    }
+    if(system("gcc ./gestion_requete/gest_req.c -o ./gestion_requete/gest_req -pthread")!= 0){
+        printf("gestion_req compilation failed\n");
+    }
 
     int server = system("gnome-terminal -- ./server_com/server");
 

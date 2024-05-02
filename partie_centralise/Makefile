@@ -42,6 +42,7 @@ clean_pipe:
 # @sleep 1
 # @gnome-terminal -- ./gestion_requete/gest_req &
 # @sleep 1
+
 run: all
 	@echo "Launching Centrale part..."
 	@gnome-terminal -- ./main
@@ -56,6 +57,5 @@ run: all
 	@gnome-terminal -- ../client_chat/client
 
 run_client: all
-
 	@echo "Launching client..."
 	@gnome-terminal -- ../client_chat/client
