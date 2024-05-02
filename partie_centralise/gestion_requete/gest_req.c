@@ -62,8 +62,7 @@ void detach_shared_memory() {
         perror("shmdt");
         exit(EXIT_FAILURE);
     }
-
-    //     // Supprimer la mémoire partagée
+    // // Supprimer la mémoire partagée
     // if (shmctl(shmid, IPC_RMID, NULL) == -1) {
     //     perror("shmctl");
     //     exit(EXIT_FAILURE);
@@ -122,6 +121,29 @@ void remove_from_shared_memory(const char *pseudo) {
 
     // Pseudo non trouvé
     printf("Pseudo '%s' not found in shared memory.\n", pseudo);
+}
+
+
+/**
+ * @brief Look if the pseudo is in the shared memory 
+ * If it's not it return true (1) and if it is false (0)
+ * 
+ * @param pseudo Pseudo to look for
+ * @return int 1 (true) if it is not found and 0 (False) if it is
+ */
+int pseudo_not_in_shared_memory(const char *pseudo) {
+   
+    // Parcourir la mémoire partagée pour trouver le pseudo à supprimer
+    for (int i = 0; i < ROWS; i++) {
+        char *current_pseudo = shared_memory + i * COLS;
+        if (strcmp(current_pseudo, pseudo) == 0) {
+            
+            printf("Pseudo '%s' found in shared memory.\n", pseudo);
+            return 0; 
+        }
+    }
+    // Pseudo not found
+    return 1;
 }
 
 
@@ -199,22 +221,16 @@ void cleanup() {
     // Détacher la mémoire partagée
     detach_shared_memory();
     
-    // // Delete the shared memory
-    // if (shmctl(shmid, IPC_RMID, NULL) == -1) {
-    //     perror("shmctl");
+    // // Delete the pipe
+    // if (unlink(PIPE_TO_GESTION) == -1) {
+    //     perror("unlink");
     //     exit(EXIT_FAILURE);
     // }
-
-    // Delete the pipe
-    if (unlink(PIPE_TO_GESTION) == -1) {
-        perror("unlink");
-        exit(EXIT_FAILURE);
-    }
-    // Delete the pipe
-    if (unlink(PIPE_TO_FILE_MSG) == -1) {
-        perror("unlink");
-        exit(EXIT_FAILURE);
-    }
+    // // Delete the pipe
+    // if (unlink(PIPE_TO_FILE_MSG) == -1) {
+    //     perror("unlink");
+    //     exit(EXIT_FAILURE);
+    // }
 
     printf("Clean exit.\n");
     exit(EXIT_SUCCESS); 
@@ -252,18 +268,25 @@ void handle_message(char message[MAX_MESSAGE_SIZE], int sockfd, struct sockaddr_
     switch (type_msg[0]) {
         case 'A':
             if (strcmp(type_msg, "A_ACC") == 0) {
-                // Envoyer au serveur UDP
-                send_udp_message(message, sockfd, servaddr);
 
-                // Attendre la réponse du serveur UDP et la renvoyer sur le pipe file_msg
-                char *response = receive_udp_response(sockfd, servaddr);
+                if (pseudo_not_in_shared_memory(pseudo)){
 
-                if (strcmp(response, "Success") == 0) {
-                    // Ajouter le pseudo à la mémoire partagée
-                    add_to_shared_memory(pseudo);
+                    // Envoyer au serveur UDP
+                    send_udp_message(message, sockfd, servaddr);
+
+                    // Attendre la réponse du serveur UDP et la renvoyer sur le pipe file_msg
+                    char *response = receive_udp_response(sockfd, servaddr);
+
+                    if (strcmp(response, "Success") == 0) {
+                        // Ajouter le pseudo à la mémoire partagée
+                        add_to_shared_memory(pseudo);
+                    }
+
+                    send_response_pipe(pipe_to_file_msg_write, response);
                 }
-
-                send_response_pipe(pipe_to_file_msg_write, response);
+                else{
+                    send_response_pipe(pipe_to_file_msg_write, "Failed");
+                }
             } else {
                 printf("Unknown message type: %s\n", type_msg);
             }

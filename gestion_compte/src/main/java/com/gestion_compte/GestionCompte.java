@@ -108,9 +108,6 @@ public class GestionCompte extends UnicastRemoteObject implements ICompte {
                     comptes.add(line);
                 }
             }
-            // Afficher tous les comptes après le chargement
-            System.out.println("Comptes chargés depuis le fichier : " + comptes);
-    
         } catch (IOException e) {
             System.err.println("Erreur lors de la lecture du fichier.");
         }
@@ -124,7 +121,6 @@ public class GestionCompte extends UnicastRemoteObject implements ICompte {
         List<String> comptes = chargerComptes();
         
         // Vérifier si le compte existe et si le mot de passe correspond
-        System.out.println("Tous les comptes chargés pour connexion : " + comptes);
         for (String compte : comptes) {
             String[] infoCompte = compte.split("#"); 
             if (infoCompte.length == 2) {

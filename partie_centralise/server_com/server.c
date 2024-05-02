@@ -236,21 +236,21 @@ void read_and_send_response( int client_socket, const char *tid_char, char *type
  * 
  */
 void cleanup() {
-    // Code de nettoyage à exécuter avant la sortie
+
     detach_shared_memory(shared_memory);
 
-    // Delete pipes
+    // // Delete pipes
 
-    if (unlink(PIPE_COM_TO_FILE_MSG) == -1) {
-        perror("unlink");
-        exit(EXIT_FAILURE);
-    }
-    if (unlink(PIPE_TO_COM) == -1) {
-        perror("unlink");
-        exit(EXIT_FAILURE);
-    }
+    // if (unlink(PIPE_COM_TO_FILE_MSG) == -1) {
+    //     perror("unlink");
+    //     exit(EXIT_FAILURE);
+    // }
+    // if (unlink(PIPE_TO_COM) == -1) {
+    //     perror("unlink");
+    //     exit(EXIT_FAILURE);
+    // }
 
-    printf("Pipes unlinked successfully.\n");
+    printf("Clean exit\n");
     exit(EXIT_FAILURE);
 }
 

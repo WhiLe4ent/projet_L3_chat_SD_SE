@@ -49,25 +49,25 @@ void cleanup() {
     close(pipe_com_to_file_msg_read);
     close(pipe_to_com_write);
 
-    // Supprimer les pipes
-    if (unlink(PIPE_TO_GESTION) == -1) {
-        perror("unlink");
-        exit(EXIT_FAILURE);
-    }
-    if (unlink(PIPE_GEST_TO_FILE_MSG) == -1) {
-        perror("unlink");
-        exit(EXIT_FAILURE);
-    }
-    if (unlink(PIPE_COM_TO_FILE_MSG) == -1) {
-        perror("unlink");
-        exit(EXIT_FAILURE);
-    }
-    if (unlink(PIPE_TO_COM) == -1) {
-        perror("unlink");
-        exit(EXIT_FAILURE);
-    }
+    // // Supprimer les pipes
+    // if (unlink(PIPE_TO_GESTION) == -1) {
+    //     perror("unlink");
+    //     exit(EXIT_FAILURE);
+    // }
+    // if (unlink(PIPE_GEST_TO_FILE_MSG) == -1) {
+    //     perror("unlink");
+    //     exit(EXIT_FAILURE);
+    // }
+    // if (unlink(PIPE_COM_TO_FILE_MSG) == -1) {
+    //     perror("unlink");
+    //     exit(EXIT_FAILURE);
+    // }
+    // if (unlink(PIPE_TO_COM) == -1) {
+    //     perror("unlink");
+    //     exit(EXIT_FAILURE);
+    // }
 
-    printf("Pipes unlinked successfully.\n");
+    printf("Clean exit.\n");
     exit(EXIT_FAILURE);
 }
 
