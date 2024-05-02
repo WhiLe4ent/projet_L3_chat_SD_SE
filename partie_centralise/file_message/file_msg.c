@@ -22,9 +22,11 @@ int pipe_to_gestion_write, pipe_gest_to_file_msg_read, pipe_com_to_file_msg_read
 sem_t semaphore;
 
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
 
-// Structure pour stocker les informations d'un message
+/**
+ * @brief Structure to stock message and tid
+ * 
+ */
 typedef struct {
     char *message;
     char tid_s[20];
@@ -141,6 +143,18 @@ int main() {
     printf("Welcome to file_msg\n");
 
 
+    // Register signal handler for SIGINT (Ctrl+C)
+    if (signal(SIGINT, cleanup) == SIG_ERR) {
+        perror("signal");
+        exit(EXIT_FAILURE);
+    }
+
+    // Register signal handler for SIGSEGV
+    if (signal(SIGSEGV, cleanup) == SIG_ERR) {
+        perror("signal");
+        exit(EXIT_FAILURE);
+    }
+
     ssize_t bytes_read;
 
     // Ouvrir les pipes en écriture
@@ -165,12 +179,6 @@ int main() {
     pipe_com_to_file_msg_read = open(PIPE_COM_TO_FILE_MSG, O_RDWR);
     if (pipe_com_to_file_msg_read == -1) {
         perror("open");
-        exit(EXIT_FAILURE);
-    }
-
-    // Définir le gestionnaire de signal pour SIGINT (Ctrl+C)
-    if (signal(SIGINT, cleanup) == SIG_ERR) {
-        perror("signal");
         exit(EXIT_FAILURE);
     }
 

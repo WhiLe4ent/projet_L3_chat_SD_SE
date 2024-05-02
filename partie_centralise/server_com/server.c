@@ -42,7 +42,11 @@ typedef struct {
 } User;
 
 
-// Structure to hold client information
+
+/**
+ * @brief Client structure to hold client information
+ * 
+ */
 typedef struct {
     char id[MAX_ID_LENGTH];
     pthread_t thread_id;
@@ -280,9 +284,13 @@ void *handle_client(void *arg) {
 
     pthread_t thread_id = pthread_self(); // Get the ID of the current thread
 
+    char tid_char[20] ;
+    int thread_id_length = snprintf(tid_char, sizeof(tid_char), "%lu", thread_id);
 
     while (1) {
+        printf("\n--------------------------------------------------\n");
         memset(buffer, 0, sizeof(buffer));
+
 
         // Read data from client
         int valread = read(client_socket, buffer, sizeof(buffer));
@@ -291,6 +299,16 @@ void *handle_client(void *arg) {
         if (valread <= 0) {
             // Client disconnected or error occurred
             printf("Client %s disconnected\n", client_id);
+            
+
+            char message[2053 + 50 ] = {0};
+            snprintf(message, 100, "%s#L_ACC%s#mdpp", tid_char, client_id); // +1 pour le #
+
+
+            write_pipe_com(message, pipe_com_to_file_write);
+            read_and_send_response( client_socket, tid_char, "L_ACC", pipe_to_com_read);
+
+            
             close(client_socket);
             if (index != -1) {
 
@@ -323,13 +341,9 @@ void *handle_client(void *arg) {
 
 
 
-        char tid_char[20] ;
-        int thread_id_length = snprintf(tid_char, sizeof(tid_char), "%lu", thread_id);
-
 
         printf("Msg_content : %s\n", message_content);
         printf("TID : %lu\n", thread_id);
-        printf("TID : %d\n", thread_id_length);
         printf("TID : %s\n", tid_char);
 
 
@@ -514,8 +528,14 @@ int main(int argc, char const *argv[]) {
     // Créer l'espace de mémoire partagée
     create_shared_memory(&shared_memory);
 
-    // Définir le gestionnaire de signal pour SIGINT (Ctrl+C)
+    // Register signal handler for SIGINT (Ctrl+C)
     if (signal(SIGINT, cleanup) == SIG_ERR) {
+        perror("signal");
+        exit(EXIT_FAILURE);
+    }
+
+    // Register signal handler for SIGSEGV
+    if (signal(SIGSEGV, cleanup) == SIG_ERR) {
         perror("signal");
         exit(EXIT_FAILURE);
     }
@@ -555,9 +575,10 @@ int main(int argc, char const *argv[]) {
         if ((new_socket = accept(server_fd, (struct sockaddr *)&address, (socklen_t *)&addrlen)) < 0) {
             perror("accept");
             exit(EXIT_FAILURE);
-        }
+        }    
         printf("Welcome in the server\n");
 
+        pthread_mutex_lock(&mutex);
         // Create a new thread to handle the client
         pthread_t client_thread;
         if (pthread_create(&client_thread, NULL, handle_client, (void *)&new_socket) < 0) {
@@ -565,6 +586,7 @@ int main(int argc, char const *argv[]) {
             close(new_socket);
             exit(EXIT_FAILURE);
         }
+        pthread_mutex_unlock(&mutex);
 
         // Detach the thread
         pthread_detach(client_thread);
