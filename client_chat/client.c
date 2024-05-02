@@ -38,6 +38,9 @@ pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 // Nom du pipe nommé
 char pipe_name[PIPE_NAME_SIZE];
 
+// sock tcp pour fermer dans le cleanup
+int sock = 0;
+
 
 /**
  * @brief Struct to hold socket, client ID, and connection status
@@ -161,8 +164,8 @@ void display_menu(int is_connected) {
     if (is_connected) {
         printf("Connected menu:\n");
         printf("1. Write a message\n");
-        printf("2. Log out of the system\n");
-        printf("3. Show list of all users\n");
+        printf("2. Show list of all users\n");
+        printf("3. Log out of the system\n");
         printf("4. Quit the client\n");
     } else {
         printf("Main menu:\n");
@@ -184,24 +187,48 @@ void display_menu(int is_connected) {
  * @return char* 
  */
 char * log_in(int sock) {
-    char pseudo[MAX_ID_LENGTH];
+    char std_inPseudo[MAX_ID_LENGTH];
     char password[MAX_ID_LENGTH];
 
-    printf("Enter your pseudo: \n");
-    if (fgets(pseudo, MAX_ID_LENGTH, stdin) == NULL) {
-        perror("Error reading pseudo");
-        return NULL;
-    }
-    // Remove newline character
-    pseudo[strcspn(pseudo, "\n")] = '\0'; 
+    char * pseudo= {0};
+
+    do {
+        printf("Enter your pseudo: \n");
+        if (fgets(std_inPseudo, MAX_ID_LENGTH, stdin) == NULL) {
+            perror("Error reading pseudo");
+            return NULL;
+        }
+
+        // Supprime les caractères de nouvelle ligne à la fin
+        std_inPseudo[strcspn(std_inPseudo, "\n")] = '\0';
+
+        pseudo = std_inPseudo;
+
+        // Supprime les espaces au début 
+        while (*pseudo && *pseudo == ' ') {
+            pseudo++;
+        }
+
+        // Supprime les espaces à la fin 
+        char *end = pseudo + strlen(pseudo) - 1;
+        while (end > pseudo && *end == ' ') {
+            *end-- = '\0';
+        }
+
+        // Vérifier si le pseudo est vide après la suppression des espaces
+        if (*pseudo == '\0') {
+            printf("Pseudo cannot be empty.\n");
+        }
+
+    } while (*pseudo == '\0');
+
 
     printf("Enter your password: \n");
     if (fgets(password, MAX_ID_LENGTH, stdin) == NULL) {
         perror("Error reading password");
         return NULL;
     }
-    password[strcspn(password, "\n")] = '\0'; // Remove newline character
-
+    password[strcspn(password, "\n")] = '\0'; 
 
 
     // Send pseudo with prefix A_ACC to the server
@@ -222,6 +249,8 @@ char * log_in(int sock) {
         return NULL;
     }
 
+    printf("Response laaaaaaaaaaaaaaaaaaaaaaa    %s\n", auth);
+    sleep(1);
 
     if (strcmp(auth, "Success") == 0) {
         // Return the pseudo as a dynamically allocated string
@@ -468,17 +497,17 @@ void delete_existing_account(int sock) {
  */
 void log_out(int sock , char *pseudo){
 
-    // Password just to have something for the strtok
-    char password[50] = "mdpp"; 
+    // // Password just to have something for the strtok
+    // char password[50] = "mdpp"; 
 
-    // Construct message with prefix D_ACC, pseudo, and password separated by a delimiter
-    char msg[150];
-    snprintf(msg, sizeof(msg), "L_ACC%s#%s", pseudo, password);
+    // // Construct message with prefix D_ACC, pseudo, and password separated by a delimiter
+    // char msg[150];
+    // snprintf(msg, sizeof(msg), "L_ACC%s#%s", pseudo, password);
 
-    if (send(sock, msg, strlen(msg), 0) == -1) {
-        perror("Error sending delete account request to server");
-        return;
-    }
+    // if (send(sock, msg, strlen(msg), 0) == -1) {
+    //     perror("Error sending delete account request to server");
+    //     return;
+    // }
 
 }
 
@@ -510,10 +539,10 @@ int get_choice() {
  * @brief Fonction de nettoyage à exécuter avant la sortie du programme
  */
 void cleanup() {
+    close(sock);
     // Supprimer le pipe nommé
     if (unlink(pipe_name) == -1) {
         perror("unlink");
-        sleep(1);
         exit(EXIT_FAILURE);
     } else {
         printf("Pipe unlinked successfully.\n");
@@ -525,7 +554,6 @@ void cleanup() {
 
 
 int main(int argc, char const *argv[]) {
-    int sock = 0;
     struct sockaddr_in serv_addr;
     char buffer[1024] = {0};
     char* client_id = NULL; // Initialize client_id to NULL
@@ -748,26 +776,26 @@ int main(int argc, char const *argv[]) {
                     
                 }
 
-                // Log out of the system -----------------------------------------------------------------
+
+                // List of connected user ----------------------------------------------------------------
                 case 2:
+                    show_user_list(sock);
+                    break;
+
+
+                // Log out of the system -----------------------------------------------------------------
+                case 3:
 
                     log_out(sock, args.client_id) ;
 
                     // Close the socket
                     close(sock);
 
-                    is_connected = 0;
-                    
                     close(args.pipe_fd);
+                    
+                    is_connected = 0;
 
                     break;
-
-
-                // List of connected user ----------------------------------------------------------------
-                case 3:
-                    show_user_list(sock);
-                    break;
-
 
                 // Quit client ---------------------------------------------------------------------------
                 case 4:
