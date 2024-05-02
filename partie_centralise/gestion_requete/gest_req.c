@@ -268,20 +268,9 @@ void handle_message(char message[MAX_MESSAGE_SIZE], int sockfd, struct sockaddr_
                 printf("Unknown message type: %s\n", type_msg);
             }
             break;
-        case 'D':
-            if (strcmp(type_msg, "D_ACC") == 0) {
-                // Envoyer le message UDP au serveur
-                send_udp_message(message, sockfd, servaddr);
-
-                // Attendre la réponse du serveur UDP et la renvoyer sur le pipe file_msg
-                char *response = receive_udp_response(sockfd, servaddr);
-                send_response_pipe(pipe_to_file_msg_write, response);
-            } else {
-                printf("Unknown message type: %s\n", type_msg);
-            }
-            break;
         case 'C':
-            if (strcmp(type_msg, "C_ACC") == 0) {
+        case 'D':
+            if (strcmp(type_msg, "D_ACC") == 0 || strcmp(type_msg, "C_ACC") == 0) {
                 // Envoyer le message UDP au serveur
                 send_udp_message(message, sockfd, servaddr);
 
@@ -292,6 +281,7 @@ void handle_message(char message[MAX_MESSAGE_SIZE], int sockfd, struct sockaddr_
                 printf("Unknown message type: %s\n", type_msg);
             }
             break;
+            
         case 'L':
             if (strcmp(type_msg, "L_ACC") == 0) {
                 // Logout

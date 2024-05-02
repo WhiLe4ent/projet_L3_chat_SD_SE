@@ -188,7 +188,7 @@ void send_tcp( int client_socket, char *message){
  * @param type_msg to aviod sending back a response to the client if he logged out
  * @param pipe_to_com_read pipe identifier
  */
-void read_and_send_response( int client_socket, const char *tid_char, char *type_msg, int pipe_to_com_read) {
+void read_and_send_response( int client_socket, const char *tid_char, char *type_msg, int pipe_to_com_read, int *logged_in) {
 
     // Buffer for storing the thread identifier received from the response
     char tid_verif[2053] = {0}; 
@@ -213,7 +213,12 @@ void read_and_send_response( int client_socket, const char *tid_char, char *type
                 printf("Response : %s\n", response);
                 // Send the response to the client
                 send_tcp(client_socket, response);
-            }else{
+            }
+            if(strcmp(type_msg, "A_ACC") == 0 && strcmp(response, "Success") == 0){
+                printf("Logged in ! \n");
+                *logged_in = 1;
+            }
+            else{
                 printf("Logged out successfully\n");
             }
 
@@ -286,6 +291,7 @@ void *handle_client(void *arg) {
 
     char tid_char[20] ;
     int thread_id_length = snprintf(tid_char, sizeof(tid_char), "%lu", thread_id);
+    int logged_in = 0 ;
 
     while (1) {
         printf("\n--------------------------------------------------\n");
@@ -299,16 +305,19 @@ void *handle_client(void *arg) {
         if (valread <= 0) {
             // Client disconnected or error occurred
             printf("Client %s disconnected\n", client_id);
+            printf("client is logged was %d logged_in", logged_in);
             
 
-            char message[2053 + 50 ] = {0};
-            snprintf(message, 100, "%s#L_ACC%s#mdpp", tid_char, client_id); // +1 pour le #
+            // Logging out !!
+            if (logged_in){
+                char message[2053 + 50 ] = {0};
+                snprintf(message, 100, "%s#L_ACC%s#mdpp", tid_char, client_id); // +1 pour le #
 
 
-            write_pipe_com(message, pipe_com_to_file_write);
-            read_and_send_response( client_socket, tid_char, "L_ACC", pipe_to_com_read);
+                write_pipe_com(message, pipe_com_to_file_write);
+                read_and_send_response( client_socket, tid_char, "L_ACC", pipe_to_com_read, &logged_in);
+            }
 
-            
             close(client_socket);
             if (index != -1) {
 
@@ -366,7 +375,7 @@ void *handle_client(void *arg) {
             write_pipe_com(message, pipe_com_to_file_write);
 
            
-            read_and_send_response( client_socket, tid_char, type_msg, pipe_to_com_read);
+            read_and_send_response( client_socket, tid_char, type_msg, pipe_to_com_read, &logged_in);
 
 
             // Extraire le client_id de la première partie de message_content
@@ -408,8 +417,10 @@ void *handle_client(void *arg) {
                     }
                     break;
 
-                // Get list of connected user
+                case 'C':
+                case 'D':
                 case 'L':
+                // Get list of connected user
                     if (strcmp(type_msg, "L_USE") == 0) { //-----------------------  List of User  -----------------------------------------
                         // Get list of connected users
 
@@ -442,7 +453,10 @@ void *handle_client(void *arg) {
 
 
                     }
-                    else if (strcmp(type_msg, "L_ACC") == 0)
+                //------------------------  Create Account  ---------------------------------------
+                //------------------------  Create Account  ---------------------------------------
+                //-------------------------  Log out Account  ---------------------------------------
+                    else if (strcmp(type_msg, "L_ACC") == 0 || strcmp(type_msg, "C_ACC") == 0 || strcmp(type_msg, "D_ACC") == 0)
                     {
                         // Receive pseudo and password from client
                         char pseudo[50] = {0}; 
@@ -453,7 +467,7 @@ void *handle_client(void *arg) {
                         printf("Pseudo : %s\nPassword : %s\n", pseudo, password);
 
                         write_pipe_com(message, pipe_com_to_file_write);
-                        read_and_send_response( client_socket, tid_char, type_msg, pipe_to_com_read);
+                        read_and_send_response( client_socket, tid_char, type_msg, pipe_to_com_read, &logged_in);
 
                     }
                     else {
@@ -461,48 +475,6 @@ void *handle_client(void *arg) {
                     }
                     break;
                 
-                // Create Account 
-                case 'C':
-                    if (strcmp(type_msg, "C_ACC") == 0) { //------------------------  Create Account  ---------------------------------------
-                        // Receive pseudo and password from client
-                        char pseudo[50] = {0}; 
-                        char password[50] = {0}; 
-
-                        // Extract pseudo and password from the message_content
-                        sscanf(message_content, "%49[^#]#%49s", pseudo, password);
-                        printf("Pseudo : %s\nPassword : %s\n", pseudo, password);
-
-                        write_pipe_com(message , pipe_com_to_file_write);
-                        read_and_send_response( client_socket, tid_char, type_msg, pipe_to_com_read);
-
-                    } else {
-                        printf("Unknown message type: %s\n", type_msg);
-                    }
-                    break;
-
-                // Delete Account
-                case 'D':
-                    if (strcmp(type_msg, "D_ACC") == 0) { //-------------------------  Delete Account  ---------------------------------------
-                        // Delete Account
-
-                        // Receive pseudo and password from client
-                        char pseudo[50] = {0}; 
-                        char password[50] = {0}; 
-
-                        // Extract pseudo and password from the message_content
-                        sscanf(message_content, "%49[^#]#%49s", pseudo, password);
-
-                        printf("Pseudo : %s\nPassword : %s\n", pseudo, password);
-
-                        write_pipe_com(message, pipe_com_to_file_write);
-
-                        read_and_send_response( client_socket, tid_char, type_msg, pipe_to_com_read) ;
-
-
-                    } else {
-                        printf("Unknown message type: %s\n", type_msg);
-                    }
-                    break;
 
                 // Default
                 default:

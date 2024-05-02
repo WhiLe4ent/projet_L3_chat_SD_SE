@@ -159,10 +159,10 @@ void clear_console() {
  * @param is_connected to choose wich menu to display
  * 
  */
-void display_menu(int is_connected) {
+void display_menu(int is_connected, char * client_id) {
     clear_console();
     if (is_connected) {
-        printf("Connected menu:\n");
+        printf("Bienvenue %s:\n", client_id);
         printf("1. Write a message\n");
         printf("2. Show list of all users\n");
         printf("3. Log out of the system\n");
@@ -243,13 +243,13 @@ char * log_in(int sock) {
 
 
     // Wait for authentication response from the server
-    char auth[2053];
+    char auth[2053] = {0};
     if (recv(sock, &auth, sizeof(auth), 0) <= 0) {
         perror("Error receiving authentication response from server");
         return NULL;
     }
 
-    printf("Response laaaaaaaaaaaaaaaaaaaaaaa    %s\n", auth);
+    printf("Response laaaaaaaaaaaaaaaaaaaaaaa %s\n", auth);
     sleep(1);
 
     if (strcmp(auth, "Success") == 0) {
@@ -288,7 +288,7 @@ void show_user_list(int sock) {
     pthread_mutex_lock(&mutex);
 
     // Receive the list from the server
-    char list[2048]; 
+    char list[2048] = {0}; 
     memset(list, 0, sizeof(list)); 
     if (recv(sock, list, sizeof(list), 0) <= 0) {
         perror("Problem with the user list, can't receive it from the server");
@@ -319,16 +319,43 @@ void show_user_list(int sock) {
 void create_new_account(int sock) {
     printf("Creating a new account...\n");
 
-    // Ask user for pseudo
-    char pseudo[50];
-    printf("Enter your pseudo: ");
-    fgets(pseudo, sizeof(pseudo), stdin);
+    char std_inPseudo[MAX_ID_LENGTH];
+    char password[MAX_ID_LENGTH];
 
-    // Remove trailing newline character from pseudo
-    pseudo[strcspn(pseudo, "\n")] = '\0';
+    char * pseudo= {0};
+
+    do {
+        printf("Enter your pseudo: \n");
+        if (fgets(std_inPseudo, MAX_ID_LENGTH, stdin) == NULL) {
+            perror("Error reading pseudo");
+            return ;
+        }
+
+        // Supprime les caractères de nouvelle ligne à la fin
+        std_inPseudo[strcspn(std_inPseudo, "\n")] = '\0';
+
+        pseudo = std_inPseudo;
+
+        // Supprime les espaces au début 
+        while (*pseudo && *pseudo == ' ') {
+            pseudo++;
+        }
+
+        // Supprime les espaces à la fin 
+        char *end = pseudo + strlen(pseudo) - 1;
+        while (end > pseudo && *end == ' ') {
+            *end-- = '\0';
+        }
+
+        // Vérifier si le pseudo est vide après la suppression des espaces
+        if (*pseudo == '\0') {
+            printf("Pseudo cannot be empty.\n");
+        }
+
+    } while (*pseudo == '\0');
+
 
     // Ask user for password
-    char password[50]; // Adjust size as needed
     do {
         printf("Enter a very strong password of at least 4 characters: ");
         fgets(password, sizeof(password), stdin);
@@ -347,11 +374,13 @@ void create_new_account(int sock) {
     }
 
     // Receive response from server
-    char response[2053];
+    char response[100] = {0};
     if (recv(sock, &response, sizeof(response), 0) <= 0) {
         perror("Problem receiving response from server");
         return;
     }
+    
+    printf("Response from server: '%s'\n", response);
 
     // Check if pseudo is already in use
     if (strcmp(response, "Failed") == 0) {
@@ -573,7 +602,7 @@ int main(int argc, char const *argv[]) {
 
 
     while (1) {
-        display_menu(is_connected);
+        display_menu(is_connected, client_id);
         choice = get_choice();
         
         if (!is_connected) {
