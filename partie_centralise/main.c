@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <pthread.h>
 
 #include <arpa/inet.h>
 #include <fcntl.h>
@@ -11,13 +10,18 @@
 #include <sys/shm.h>
 #include <signal.h>
 
+
 #define PIPE_TO_GESTION "./pipe_to_gestion"
 #define PIPE_GEST_TO_FILE_MSG "./pipe_gest_to_file_msg"
 #define PIPE_COM_TO_FILE_MSG "./pipe_com_to_file_msg"
 #define PIPE_TO_COM "./pipe_to_com"
 
+
+
 #define ROWS 10
 #define COLS 50
+
+
 
 void create_shared_memory() {
     // Générer une clé unique avec ftok
@@ -29,27 +33,13 @@ void create_shared_memory() {
         perror("shmget");
         exit(EXIT_FAILURE);
     }
-}
 
-void *server_thread(void *arg) {
-    system("gnome-terminal -- ./server_com/server");
-    pthread_exit(NULL);
-}
 
-void *file_msg_thread(void *arg) {
-    system("gnome-terminal -- ./file_message/file_msg");
-    pthread_exit(NULL);
-}
-
-void *gest_req_thread(void *arg) {
-    system("gnome-terminal -- ./gestion_requete/gest_req");
-    pthread_exit(NULL);
 }
 
 int main() {
-    pthread_t server_tid, file_msg_tid, gest_req_tid;
 
-    // Create the named pipes
+    // Create the named pipe ---------------------------------------------------------
     if (mkfifo(PIPE_COM_TO_FILE_MSG, 0666) == -1) {
         perror("mkfifo");
         exit(EXIT_FAILURE);
@@ -58,6 +48,7 @@ int main() {
         perror("mkfifo");
         exit(EXIT_FAILURE);
     }
+        // Créer les pipes
     if (mkfifo(PIPE_TO_GESTION, 0666) == -1) {
         perror("mkfifo");
         exit(EXIT_FAILURE);
@@ -68,28 +59,29 @@ int main() {
     }
     create_shared_memory();
 
-    // Create server thread
-    if (pthread_create(&server_tid, NULL, server_thread, NULL) != 0) {
-        perror("pthread_create");
-        exit(EXIT_FAILURE);
-    }
 
-    // Create file_msg thread
-    if (pthread_create(&file_msg_tid, NULL, file_msg_thread, NULL) != 0) {
-        perror("pthread_create");
-        exit(EXIT_FAILURE);
+    // Compiling source file
+    if(system("gcc ./server_com/server.c -o ./server_com/server -pthread") != 0){
+        printf("erver compilation failed\n");
     }
-
-    // Create gest_req thread
-    if (pthread_create(&gest_req_tid, NULL, gest_req_thread, NULL) != 0) {
-        perror("pthread_create");
-        exit(EXIT_FAILURE);
+    if(system("gcc ./file_message/file_msg.c -o ./file_message/file_msg -pthread") !=0){
+           printf("file_msg compilation failed\n");
     }
+    if(system("gcc ./gestion_requete/gest_req.c -o ./gestion_requete/gest_req -pthread")!= 0){
+        printf("gestion_req compilation failed\n");
+    }
+    
+    // wait 10 millisecondes to finish compiling
+    usleep(10000); 
 
-    // Wait for threads to finish
-    pthread_join(server_tid, NULL);
-    pthread_join(file_msg_tid, NULL);
-    pthread_join(gest_req_tid, NULL);
+    int server = system("gnome-terminal -- ./server_com/server");
+
+    // pour file_msg
+    int file_msg = system("gnome-terminal -- ./file_message/file_msg");
+
+    // pour gest_req
+    int gest_req = system("gnome-terminal -- ./gestion_requete/gest_req");
+
 
     return 0;
 }
