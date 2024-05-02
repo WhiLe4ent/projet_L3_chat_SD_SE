@@ -102,24 +102,46 @@ int main() {
     
     pthread_mutex_unlock(&mutex);
 
+    char server_ip[20] = {0};
+    int rmi_port, tcp_port;
 
+    // Adresse IP du serveur RMI
+    printf("Entrez l'adresse IP du serveur RMI : ");
+    scanf("%19s", server_ip); 
+
+    // Port du serveur RMI
+    printf("Entrez le port du serveur RMI (1099 est conseillé): \n");
+    scanf("%d", &rmi_port);
+
+    // Port TCP
+    printf("Entrez le port TCP (8080 est conseillé) : \n");
+    scanf("%d", &tcp_port);
+
+    // Lancement du serveur, file_msg et gest_req
     pthread_mutex_lock(&mutex);
-   // Launch server, file_msg, and gest_req
-    if (system("gnome-terminal -- ./server_com/server") != 0) {
+    char command[200]; // Définir une taille suffisante pour la commande
+    // Construction de la commande avec les arguments
+    sprintf(command, "gnome-terminal -- ./server_com/server %d", tcp_port);
+    if (system(command) != 0) {
         perror("Error launching server_com/server");
         exit(EXIT_FAILURE);
     }
-    if (system("gnome-terminal -- ./file_message/file_msg") != 0) {
+    sprintf(command, "gnome-terminal -- ./file_message/file_msg");
+    if (system(command) != 0) {
         perror("Error launching file_message/file_msg");
         exit(EXIT_FAILURE);
     }
-    if (system("gnome-terminal -- ./gestion_requete/gest_req") != 0) {
+    sprintf(command, "gnome-terminal -- ./gestion_requete/gest_req");
+    if (system(command) != 0) {
         perror("Error launching gestion_requete/gest_req");
         exit(EXIT_FAILURE);
     }
 
     printf("Exécution de Client_RMI.java...\n");
-    if (system("java -cp ./clientrmi/target/classes:/home/while4ent/.m2/repository/com/gestion_compte/gestion_compte/1.0-SNAPSHOT/gestion_compte-1.0-SNAPSHOT.jar com.clientrmi.ClientRMI ") != 0) {
+    // Construction de la commande pour exécuter Java avec les arguments récupérés
+    sprintf(command, "java -cp ./clientrmi/target/classes:/home/while4ent/.m2/repository/com/gestion_compte/gestion_compte/1.0-SNAPSHOT/gestion_compte-1.0-SNAPSHOT.jar com.clientrmi.ClientRMI %s %d", server_ip, rmi_port);
+    // Exécution de la commande et vérification si l'exécution a réussi
+    if (system(command) != 0) {
         perror("Erreur lors de l'exécution de ClientRMI\n");
     }
     pthread_mutex_unlock(&mutex);

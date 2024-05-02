@@ -48,6 +48,8 @@ void cleanup() {
     close(pipe_gest_to_file_msg_read);
     close(pipe_com_to_file_msg_read);
     close(pipe_to_com_write);
+    
+    // deleting the pipes in the main now
 
     // // Supprimer les pipes
     // if (unlink(PIPE_TO_GESTION) == -1) {

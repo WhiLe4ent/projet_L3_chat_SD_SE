@@ -48,14 +48,14 @@ run: all
 	@gnome-terminal -- ./main
 	@sleep 1
 	@echo "Launching client..."
-	@gnome-terminal -- ../client_chat/client
+	@gnome-terminal -- ../client_chat/client 8080 127.0.0.1
 	@sleep 1
 	@echo "Launching client 2..."
-	@gnome-terminal -- ../client_chat/client
+	@gnome-terminal -- ../client_chat/client 8080 127.0.0.1
 	@sleep 1
 	@echo "Launching client 3..."
-	@gnome-terminal -- ../client_chat/client
+	@gnome-terminal -- ../client_chat/client 8080 127.0.0.1
 
 run_client: all
 	@echo "Launching client..."
-	@gnome-terminal -- ../client_chat/client
+	@gnome-terminal -- ../client_chat/client 8080 127.0.0.1

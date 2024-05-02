@@ -126,7 +126,7 @@ void remove_from_shared_memory(const char *pseudo) {
 
 /**
  * @brief Look if the pseudo is in the shared memory 
- * If it's not it return true (1) and if it is false (0)
+ * If it's not in the shared memory it return true (1) and if it is false (0)
  * 
  * @param pseudo Pseudo to look for
  * @return int 1 (true) if it is not found and 0 (False) if it is
@@ -221,6 +221,7 @@ void cleanup() {
     // Détacher la mémoire partagée
     detach_shared_memory();
     
+    // deleting the pipes in the main now
     // // Delete the pipe
     // if (unlink(PIPE_TO_GESTION) == -1) {
     //     perror("unlink");

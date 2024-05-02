@@ -16,7 +16,6 @@
 #define PIPE_TO_COM "./pipe_to_com"
 
 
-#define PORT 8080
 #define MAX_CLIENTS 10 // Maximum number of clients
 #define MAX_ID_LENGTH 50 // Maximum length of client ID
 
@@ -238,6 +237,8 @@ void read_and_send_response( int client_socket, const char *tid_char, char *type
 void cleanup() {
 
     detach_shared_memory(shared_memory);
+
+    // deleting the pipes in the main now
 
     // // Delete pipes
 
@@ -526,7 +527,7 @@ int main(int argc, char const *argv[]) {
     }
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = INADDR_ANY;
-    address.sin_port = htons(PORT);
+    address.sin_port = htons(atoi(argv[1]));
 
     // Bind the socket ---------------------------------------------------------
     if (bind(server_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
@@ -540,7 +541,7 @@ int main(int argc, char const *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    printf("Server listening on port %d...\n", PORT);
+    printf("Server listening on port %d...\n", atoi(argv[1]));
 
     while (1) {
          // Accept incoming connection
