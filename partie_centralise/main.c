@@ -133,9 +133,9 @@ int main() {
     if (system("javac -cp /home/while4ent/.m2/repository/com/gestion_compte/gestion_compte/1.0-SNAPSHOT/gestion_compte-1.0-SNAPSHOT.jar:/home/while4ent/Bureau/fac/L3/S6/Projet/projet_L3_chat_SD_SE/partie_centralise/clientrmi/target/classes ./clientrmi/src/main/java/com/clientrmi/ClientRMI.java ") != 0) {
         perror("Erreur lors de la compilation de ClientRMI.java\n");
         sleep(1);
-        exit(EXIT_FAILURE);
+        // exit(EXIT_FAILURE);
     }
-    
+    printf("Compilation done !\n");
     pthread_mutex_unlock(&mutex);
 
     char server_ip[20] = {0};
