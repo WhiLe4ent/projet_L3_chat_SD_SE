@@ -34,7 +34,7 @@ gest_req: ./gestion_requete/gest_req.c
 .PHONY: clean clean_pipe run run_client run_server run_gest_req run_file_msg
 
 clean:
-	rm -f *.o ../client_chat/client ./client_chat/afficheur_msg ./server_com/server ./file_message/file_msg ./gestion_requete/gest_req  ./client_chat/message_pipe_* ./pipe_to_gestion ./pipe_gest_to_files_msg ./pipe_com_to_files_msg ./pipe_to_com 
+	rm -f *.o ../client_chat/client ../client_chat/afficheur_msg ./server_com/server ./file_message/file_msg ./gestion_requete/gest_req ./main ./client_chat/message_pipe_* ./pipe_to_gestion ./pipe_gest_to_files_msg ./pipe_com_to_files_msg ./pipe_to_com ./clientrmi/src/main/java/com/clientrmi/ClientRMI.class
 
 clean_pipe:
 	rm -rf ./pipe_to_gestion ./pipe_gest_to_file_msg ./pipe_com_to_file_msg ./pipe_to_com ../client_chat/message_pipe_*
@@ -44,15 +44,16 @@ clean_pipe:
 run: all
 	@echo "Launching Centrale part..."
 	@gnome-terminal -- ./main
-	@sleep 1
-	@echo "Launching client..."
-	@gnome-terminal -- ../client_chat/client $(SERVER_PORT) $(SERVER_IP)
-	@sleep 1
-	@echo "Launching client 2..."
-	@gnome-terminal -- ../client_chat/client $(SERVER_PORT) $(SERVER_IP)
-	@sleep 1
-	@echo "Launching client 3..."
-	@gnome-terminal -- ../client_chat/client $(SERVER_PORT) $(SERVER_IP)
+	
+	# @sleep 1
+	# @echo "Launching client..."
+	# @gnome-terminal -- ../client_chat/client $(SERVER_PORT) $(SERVER_IP)
+	# @sleep 1
+	# @echo "Launching client 2..."
+	# @gnome-terminal -- ../client_chat/client $(SERVER_PORT) $(SERVER_IP)
+	# @sleep 1
+	# @echo "Launching client 3..."
+	# @gnome-terminal -- ../client_chat/client $(SERVER_PORT) $(SERVER_IP)
 
 run_client: client
 	@echo "Launching client..."

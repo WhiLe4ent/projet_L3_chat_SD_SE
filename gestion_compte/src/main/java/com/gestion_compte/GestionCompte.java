@@ -221,7 +221,7 @@ public class GestionCompte extends UnicastRemoteObject implements ICompte {
             // GestionCompte stub = gestionCompte;
     
             // Obtention du registre RMI
-            Registry registry = LocateRegistry.createRegistry(1099);
+            Registry registry = LocateRegistry.createRegistry(Integer.parseInt(args[0]));
     
             // Enregistrement du stub de l'objet distant dans le registre RMI
             registry.rebind("GestionCompte", gestionCompte);

@@ -78,6 +78,7 @@ void cleanup() {
         perror("unlink");
         exit(EXIT_FAILURE);
     }
+    system("make clean");
 
     printf("Clean exit.\n");
     exit(EXIT_SUCCESS);
@@ -146,12 +147,28 @@ int main() {
     scanf("%19s", server_ip); 
 
     // Port du serveur RMI
-    printf("Entrez le port du serveur RMI (1099 est conseillé): \n");
-    scanf("%d", &rmi_port);
+    while (1) {
+        printf("Entrez le port du serveur RMI (1099 est conseillé) : ");
+        if (scanf("%d", &rmi_port) != 1 || rmi_port < 0 || rmi_port > 65535) {
+            printf("Erreur: Port invalide.\n");
+            // Nettoyer le tampon d'entrée
+            while (getchar() != '\n');
+        } else {
+            break;
+        }
+    }
 
     // Port TCP
-    printf("Entrez le port TCP (8080 est conseillé) : \n");
-    scanf("%d", &tcp_port);
+    while (1) {
+        printf("Entrez le port TCP (8080 est conseillé) : ");
+        if (scanf("%d", &tcp_port) != 1 || tcp_port < 0 || tcp_port > 65535) {
+            printf("Erreur: Port invalide.\n");
+            // Nettoyer le tampon d'entrée
+            while (getchar() != '\n');
+        } else {
+            break;
+        }
+    }
 
     // Lancement du serveur, file_msg et gest_req
     pthread_mutex_lock(&mutex);
