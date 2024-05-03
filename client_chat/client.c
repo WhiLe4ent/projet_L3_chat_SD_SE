@@ -26,11 +26,9 @@
 #include <errno.h>
 #include <signal.h>
 
-#define PORT 8080
 #define PIPE_NAME_PREFIX "message_pipe_"
 #define PIPE_NAME_SIZE 100
 #define MAX_ID_LENGTH 50
-#define IP_AD "127.0.0.1"
 
 // Mutex pour l'accès au pipe
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -249,8 +247,6 @@ char * log_in(int sock) {
         return NULL;
     }
 
-    printf("Response laaaaaaaaaaaaaaaaaaaaaaa %s\n", auth);
-    sleep(1);
 
     if (strcmp(auth, "Success") == 0) {
         // Return the pseudo as a dynamically allocated string
@@ -619,10 +615,10 @@ int main(int argc, char const *argv[]) {
                     }
 
                     serv_addr.sin_family = AF_INET;
-                    serv_addr.sin_port = htons(PORT);
+                    serv_addr.sin_port = htons(atoi(argv[1]));
 
                     // Convert IP address from text to binary form
-                    if (inet_pton(AF_INET, IP_AD, &serv_addr.sin_addr) <= 0) {
+                    if (inet_pton(AF_INET, argv[2], &serv_addr.sin_addr) <= 0) {
                         printf("\nInvalid address/ Address not supported\n");
                         return -1;
                     }
@@ -704,10 +700,10 @@ int main(int argc, char const *argv[]) {
                     }
 
                     serv_addr.sin_family = AF_INET;
-                    serv_addr.sin_port = htons(PORT);
+                    serv_addr.sin_port = htons(atoi(argv[1]));
 
                     // Convert IP address from text to binary form
-                    if (inet_pton(AF_INET, IP_AD, &serv_addr.sin_addr) <= 0) {
+                    if (inet_pton(AF_INET, argv[2], &serv_addr.sin_addr) <= 0) {
                         printf("\nInvalid address/ Address not supported\n");
                         return -1;
                     }
@@ -733,10 +729,10 @@ int main(int argc, char const *argv[]) {
                     }
 
                     serv_addr.sin_family = AF_INET;
-                    serv_addr.sin_port = htons(PORT);
+                    serv_addr.sin_port = htons(atoi(argv[1]));
 
                     // Convert IP address from text to binary form
-                    if (inet_pton(AF_INET, IP_AD, &serv_addr.sin_addr) <= 0) {
+                    if (inet_pton(AF_INET, argv[2], &serv_addr.sin_addr) <= 0) {
                         printf("\nInvalid address/ Address not supported\n");
                         return -1;
                     }

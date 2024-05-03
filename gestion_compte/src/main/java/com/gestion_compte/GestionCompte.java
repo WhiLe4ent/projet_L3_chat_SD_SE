@@ -11,10 +11,15 @@ import java.rmi.registry.Registry;
 public class GestionCompte extends UnicastRemoteObject implements ICompte {
     private static final String FILE_PATH = "./src/main/resources/bdd_compte.txt";
 
+    /**
+     * Constructeur
+     * @throws RemoteException
+     */
     protected GestionCompte() throws RemoteException {
         super();
     }
 
+    
     @Override
     public boolean creerCompte(String pseudo, String mdp) throws RemoteException {
         // Vérifier si le pseudo est déjà utilisé
@@ -37,6 +42,12 @@ public class GestionCompte extends UnicastRemoteObject implements ICompte {
         }
     }
 
+
+    /**
+     * Verify if the pseudo is already in use.
+     * @param pseudo Pseudo to verify
+     * @return boolean true if it exist and false if it doesn't
+     */
     private boolean compteExisteDeja(String pseudo) {
         List<String> comptes = chargerComptes();
         for (String compte : comptes) {
@@ -82,6 +93,12 @@ public class GestionCompte extends UnicastRemoteObject implements ICompte {
         }
     }
     
+
+    /**
+     * Save the comptes in the bdd_comptes.txt
+     * @param comptes
+     * @return boolean true if it worked and false otherwise
+     */
     private boolean sauvegarderComptes(List<String> comptes) {
         // Sauvegarder les comptes dans la base de données
         try {
@@ -98,6 +115,11 @@ public class GestionCompte extends UnicastRemoteObject implements ICompte {
         }
     }
     
+
+    /**
+     * Get the comptes present in the bdd_comptes.txt.
+     * @return the list of the comptes.
+     */
     private List<String> chargerComptes() {
         List<String> comptes = new ArrayList<>();
         try (BufferedReader reader = new BufferedReader(new FileReader(FILE_PATH))) {
@@ -140,7 +162,11 @@ public class GestionCompte extends UnicastRemoteObject implements ICompte {
     }
     
     
-
+    /**
+     * Handle the message depending of its prefix and do the appropriate action.
+     * @param message Received message to handle
+     * @throws RemoteException
+     */
     public void handleMessage(String message) throws RemoteException {
         // Séparer le préfixe et les données du message
         //String action = message.substring(0, 5);

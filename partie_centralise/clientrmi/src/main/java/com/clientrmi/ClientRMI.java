@@ -15,6 +15,7 @@ import java.rmi.RemoteException;
 public class ClientRMI {
 
     public static void main(String[] args) {
+        System.out.println("Welcome in ClientRMI !");
 
         if (args.length < 2) {
             System.err.println("Usage: java ClientRMI <adresse_ip_serveur_RMI> <port_serveur_RMI>");
@@ -25,7 +26,10 @@ public class ClientRMI {
             // Adresse IP et port du serveur RMI
             String serverIP = args[0] ; // "10.1.13.62"; 
             int serverPort = Integer.parseInt(args[1]);
+            System.out.println("IP :" + serverIP);
+            System.out.println("PORT :" + serverPort);
 
+            
             
             // Charger le fichier de politique de sécurité
             System.setProperty("java.security.policy", "./resources/security.policy");
@@ -48,7 +52,7 @@ public class ClientRMI {
             new Thread(() -> {
                 try {
                     // Créer un socket UDP pour écouter les messages
-                    DatagramSocket socket = new DatagramSocket(serverPort); // Port arbitraire
+                    DatagramSocket socket = new DatagramSocket(4003); // Port arbitraire
 
                     byte[] buffer = new byte[2048 + 5];
 

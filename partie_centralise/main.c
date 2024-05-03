@@ -55,7 +55,43 @@ void delete_shared_memory(){
 }
 
 
+void cleanup() {
+    // Code de nettoyage à exécuter avant la sortie
+    
+    // Détacher et supprimé la mémoire partagée
+    delete_shared_memory();
+
+    // Supprimer les pipes
+    if (unlink(PIPE_TO_GESTION) == -1) {
+        perror("unlink");
+        exit(EXIT_FAILURE);
+    }
+    if (unlink(PIPE_GEST_TO_FILE_MSG) == -1) {
+        perror("unlink");
+        exit(EXIT_FAILURE);
+    }
+    if (unlink(PIPE_COM_TO_FILE_MSG) == -1) {
+        perror("unlink");
+        exit(EXIT_FAILURE);
+    }
+    if (unlink(PIPE_TO_COM) == -1) {
+        perror("unlink");
+        exit(EXIT_FAILURE);
+    }
+
+    printf("Clean exit.\n");
+    exit(EXIT_SUCCESS);
+}
+
+
 int main() {
+
+    // Register signal handler for SIGINT (Ctrl+C)
+    if (signal(SIGINT, cleanup) == SIG_ERR) {
+        perror("signal");
+        exit(EXIT_FAILURE);
+    }
+
 
     // Create the named pipe ---------------------------------------------------------
     if (mkfifo(PIPE_COM_TO_FILE_MSG, 0666) == -1) {
@@ -119,7 +155,7 @@ int main() {
 
     // Lancement du serveur, file_msg et gest_req
     pthread_mutex_lock(&mutex);
-    char command[200]; // Définir une taille suffisante pour la commande
+    char command[500]; 
     // Construction de la commande avec les arguments
     sprintf(command, "gnome-terminal -- ./server_com/server %d", tcp_port);
     if (system(command) != 0) {
@@ -138,9 +174,10 @@ int main() {
     }
 
     printf("Exécution de Client_RMI.java...\n");
-    // Construction de la commande pour exécuter Java avec les arguments récupérés
+    // Execute classpath
+    // Executing ClientRMI.
     sprintf(command, "java -cp ./clientrmi/target/classes:/home/while4ent/.m2/repository/com/gestion_compte/gestion_compte/1.0-SNAPSHOT/gestion_compte-1.0-SNAPSHOT.jar com.clientrmi.ClientRMI %s %d", server_ip, rmi_port);
-    // Exécution de la commande et vérification si l'exécution a réussi
+
     if (system(command) != 0) {
         perror("Erreur lors de l'exécution de ClientRMI\n");
     }
@@ -149,27 +186,10 @@ int main() {
     printf("C'est finis !\n");
 
 
-    // Détacher la mémoire partagée
-    delete_shared_memory();
+
     
     // Delete pipes
-    // Supprimer les pipes
-    if (unlink(PIPE_TO_GESTION) == -1) {
-        perror("unlink");
-        exit(EXIT_FAILURE);
-    }
-    if (unlink(PIPE_GEST_TO_FILE_MSG) == -1) {
-        perror("unlink");
-        exit(EXIT_FAILURE);
-    }
-    if (unlink(PIPE_COM_TO_FILE_MSG) == -1) {
-        perror("unlink");
-        exit(EXIT_FAILURE);
-    }
-    if (unlink(PIPE_TO_COM) == -1) {
-        perror("unlink");
-        exit(EXIT_FAILURE);
-    }
+    cleanup();
 
     return 0;
 }

@@ -99,6 +99,35 @@ void detach_shared_memory(char *shared_memory) {
 
 
 /**
+ * @brief Remove all pseudo from the shared_memory
+ * 
+ */
+void remove_all_from_shared_memory() {
+   
+    // Effacer tous les pseudonymes de la mémoire partagée
+    for (int i = 0; i < ROWS; i++) {
+        char *current_pseudo = shared_memory + i * COLS;
+
+            
+        // Trouvé le pseudo à supprimer, puis déplacer les pseudos suivants vers le haut
+        for (int j = i; j < ROWS - 1; j++) {
+            char *next_pseudo = shared_memory + (j + 1) * COLS;
+            strcpy(current_pseudo, next_pseudo);
+            current_pseudo = next_pseudo;
+        }
+
+        // Effacer le dernier pseudonyme
+        memset(current_pseudo, 0, COLS);
+    }
+
+    // Pseudo non trouvé
+    printf("All pseudonyms removed from shared memory.\n");
+    return;
+
+
+}
+
+/**
  * @brief Get the connected list of connected users from the shared memory
  * 
  * @param shared_memory 
@@ -237,6 +266,7 @@ void read_and_send_response( int client_socket, const char *tid_char, char *type
 void cleanup() {
 
     detach_shared_memory(shared_memory);
+    remove_all_from_shared_memory() ;
 
     // deleting the pipes in the main now
 

@@ -400,14 +400,14 @@ int main() {
     close(sockfd);
     close(pipe_to_gestion_read);
     close(pipe_to_file_msg_write);  // Fermer le pipe vers file_msg
-    if (unlink(PIPE_TO_GESTION) == -1) {
-        perror("Error unlinking pipe");
-        return -1;
-    }
-    if (unlink(PIPE_TO_FILE_MSG) == -1) {
-        perror("Error unlinking pipe");
-        return -1;
-    }
+    // if (unlink(PIPE_TO_GESTION) == -1) {
+    //     perror("Error unlinking pipe");
+    //     return -1;
+    // }
+    // if (unlink(PIPE_TO_FILE_MSG) == -1) {
+    //     perror("Error unlinking pipe");
+    //     return -1;
+    // }
 
     return 0;
 }
